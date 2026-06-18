@@ -1,0 +1,202 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+:root{
+    --bg:#050a07;
+    --panel:#08110c;
+    --green:#00ff88;
+    --text:#c9ffd9;
+}
+
+html{
+    scroll-behavior:smooth;
+}
+
+body{
+    background:var(--bg);
+    color:var(--text);
+
+    font-family:Consolas, monospace;
+
+    padding:40px;
+
+    background-image:
+    linear-gradient(
+        rgba(0,255,136,.03) 1px,
+        transparent 1px
+    );
+
+    background-size:100% 40px;
+}
+
+section{
+    max-width:1200px;
+    margin:0 auto 40px auto;
+}
+
+h1{
+    font-size:70px;
+    color:var(--green);
+
+    text-shadow:
+    0 0 20px rgba(0,255,136,.4);
+}
+
+h2{
+    color:var(--green);
+    margin-bottom:20px;
+}
+
+.hero{
+    text-align:center;
+    padding:80px 0;
+}
+
+.hero p{
+    margin-top:15px;
+    font-size:20px;
+}
+
+.panel{
+    background:var(--panel);
+
+    border:1px solid var(--green);
+
+    border-radius:14px;
+
+    padding:25px;
+
+    box-shadow:
+        0 0 25px rgba(0,255,136,.12);
+}
+
+.panel p{
+    margin-bottom:12px;
+}
+
+.skills .skill{
+    margin-bottom:20px;
+}
+
+.bar{
+    margin-top:8px;
+
+    height:12px;
+
+    background:#111;
+
+    border-radius:10px;
+
+    overflow:hidden;
+}
+
+.bar div{
+    height:100%;
+
+    background:var(--green);
+
+    box-shadow:
+        0 0 15px var(--green);
+}
+
+.project-grid{
+    display:grid;
+
+    grid-template-columns:
+    repeat(auto-fit,minmax(280px,1fr));
+
+    gap:20px;
+}
+
+.project-card{
+    background:var(--panel);
+
+    border:1px solid var(--green);
+
+    border-radius:14px;
+
+    padding:25px;
+
+    transition:.25s;
+}
+
+.project-card:hover{
+
+    transform:
+        translateY(-6px);
+
+    box-shadow:
+        0 0 20px rgba(0,255,136,.25);
+}
+
+.project-card h3{
+    color:var(--green);
+    margin-bottom:10px;
+}
+
+.terminal{
+    background:#030604;
+
+    border:1px solid var(--green);
+
+    border-radius:14px;
+
+    padding:25px;
+
+    box-shadow:
+        0 0 20px rgba(0,255,136,.15);
+}
+
+.terminal pre{
+    white-space:pre-wrap;
+    line-height:1.7;
+}
+
+.packet{
+    position:fixed;
+
+    pointer-events:none;
+
+    color:var(--green);
+
+    font-size:12px;
+
+    font-weight:bold;
+
+    text-shadow:
+        0 0 8px var(--green);
+
+    animation:
+        fadeOut 1.5s linear forwards;
+
+    z-index:9999;
+}
+
+@keyframes fadeOut{
+
+    0%{
+        opacity:1;
+        transform:
+            translateY(0);
+    }
+
+    100%{
+        opacity:0;
+        transform:
+            translateY(-25px);
+    }
+}
+
+@media(max-width:768px){
+
+    h1{
+        font-size:42px;
+    }
+
+    body{
+        padding:20px;
+    }
+}
