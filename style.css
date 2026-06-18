@@ -200,3 +200,66 @@ h2{
         padding:20px;
     }
 }
+
+
+.navbar{
+
+    position:sticky;
+
+    top:20px;
+
+    z-index:1000;
+
+    max-width:1200px;
+
+    margin:0 auto 40px auto;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:18px 25px;
+
+    background:rgba(8,17,12,.8);
+
+    backdrop-filter:blur(10px);
+
+    border:1px solid #00ff88;
+
+    border-radius:14px;
+}
+
+.logo{
+
+    color:#00ff88;
+
+    font-weight:bold;
+
+    font-size:20px;
+}
+
+.nav-links{
+
+    display:flex;
+
+    gap:20px;
+}
+
+.nav-links a{
+
+    color:#c9ffd9;
+
+    text-decoration:none;
+
+    transition:.2s;
+}
+
+.nav-links a:hover{
+
+    color:#00ff88;
+
+    text-shadow:
+        0 0 10px #00ff88;
+}
