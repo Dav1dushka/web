@@ -690,15 +690,71 @@ async def menu_profile(c:CallbackQuery):
     await c.message.edit_text(f"<b>{texts(lang)['profile_title']}</b>\n\n🌐 {lang}\n🌍 {u['timezone']}\n📅 {total[0]}",reply_markup=back_kb(lang),parse_mode="HTML"); await c.answer()
 
 
-b.execute("UPDATE reminders SET notified_leads=? WHERE id=?",(updated,rid))
-                    if lead==0:
-                        nxt=next_dt(dt,rep)
+async def worker(bot):
+    while True:
+        await digest(bot)
+        now = datetime.now(timezone.utc)
+
+        async with aiosqlite.connect(DB) as db:
+            rows = await (
+                await db.execute(
+                    "SELECT id,telegram_id,title,reminder_at,repeat,category,lead_minutes,notified_leads "
+                    "FROM reminders WHERE status='active' ORDER BY reminder_at"
+                )
+            ).fetchall()
+
+            for rid, owner, title, dt_text, repeat, category, lead_text, notified in rows:
+                dt = datetime.fromisoformat(dt_text)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+
+                leads = [
+                    int(x)
+                    for x in (lead_text or "0").split(",")
+                    if x.strip().isdigit()
+                ]
+
+                for lead in leads:
+                    if now < dt - timedelta(minutes=lead):
+                        continue
+                    if f",{lead}," in f",{notified},":
+                        continue
+
+                    for uid in await recipients(rid, owner):
+                        u = await user(uid)
+                        local = dt.astimezone(tz_of(u))
+                        await bot.send_message(
+                            uid,
+                            f"<b>{texts(u['language'])['reminder']}</b>\n\n"
+                            f"{CAT.get(category, CAT['other'])[0]} {html.escape(title)}\n"
+                            f"⏰ {local:%d.%m.%Y %H:%M}",
+                            parse_mode="HTML",
+                            reply_markup=action_kb(u["language"], rid),
+                        )
+
+                    updated = (notified + "," + str(lead)).strip(",")
+                    await db.execute(
+                        "UPDATE reminders SET notified_leads=? WHERE id=?",
+                        (updated, rid),
+                    )
+
+                    if lead == 0:
+                        nxt = next_dt(dt, repeat)
+
                         if nxt is None:
-                            await db.execute("UPDATE reminders SET status='completed',sent_at=? WHERE id=?",(datetime.now(timezone.utc).isoformat(),rid))
+                            await db.execute(
+                                "UPDATE reminders SET status='completed', sent_at=? WHERE id=?",
+                                (datetime.now(timezone.utc).isoformat(), rid),
+                            )
                         else:
-                            await db.execute("UPDATE reminders SET reminder_at=?,notified_leads='' WHERE id=?",(nxt.isoformat(),rid))
+                            await db.execute(
+                                "UPDATE reminders SET reminder_at=?, notified_leads='' WHERE id=?",
+                                (nxt.isoformat(), rid),
+                            )
                         break
+
             await db.commit()
+
         await asyncio.sleep(CHECK)
 
 
