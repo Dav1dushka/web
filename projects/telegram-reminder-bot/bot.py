@@ -228,6 +228,8 @@ async def home(msg, lang, edit=False):
 def parse_dt(s,tz):
     return datetime.strptime(s.strip(),"%d.%m.%Y %H:%M").replace(tzinfo=tz)
 
+parse_datetime = parse_dt
+
 
 def next_dt(dt, repeat):
     if repeat=="once": return None
@@ -629,7 +631,11 @@ async def worker(bot):
                         u=await user(uid); local=dt.astimezone(tz_of(u))
                         await bot.send_message(uid,f"<b>{texts(u['language'])['reminder']}</b>\n\n{CAT.get(cat,CAT['other'])[0]} {html.escape(title)}\n⏰ {local:%d.%m.%Y %H:%M}",parse_mode="HTML",reply_markup=action_kb(u["language"],rid))
                     updated=(notified+","+str(lead)).strip(",")
-                    await d@dp.callback_query(F.data=="menu:search")
+                    await d@dp.callback_query(F.data=="noop")
+async def noop(c:CallbackQuery):
+    await c.answer()
+
+@dp.callback_query(F.data=="menu:search")
 async def menu_search(c:CallbackQuery,state:FSMContext):
     lang=(await user(c.from_user.id))["language"]; await state.set_state(Search.text)
     await c.message.edit_text(texts(lang)["search"],reply_markup=back_kb(lang)); await c.answer()
