@@ -11,6 +11,7 @@ jobs:
     env:
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
       BOT_TIMEZONE: Europe/Prague
+      PYTHONUNBUFFERED: "1"
 
     steps:
       - name: Checkout
@@ -24,9 +25,32 @@ jobs:
       - name: Install dependencies
         run: |
           cd projects/telegram-reminder-bot
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Check Telegram token
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          token = os.environ["BOT_TOKEN"]
+          url = f"https://api.telegram.org/bot{token}/getMe"
+
+          with urllib.request.urlopen(url, timeout=15) as response:
+              data = json.load(response)
+
+          if not data.get("ok"):
+              raise SystemExit(f"Telegram API error: {data}")
+
+          print(
+              "Telegram bot OK:",
+              data["result"].get("username", "unknown")
+          )
+          PY
 
       - name: Start bot
         run: |
           cd projects/telegram-reminder-bot
-          python bot.py
+          python -u bot.py
