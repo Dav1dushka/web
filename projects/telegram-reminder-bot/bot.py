@@ -1,6 +1,7 @@
 import asyncio
 import os
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import aiosqlite
 from aiogram import Bot, Dispatcher
@@ -9,6 +10,7 @@ from aiogram.types import Message
 
 DB_NAME = "reminders.db"
 CHECK_EVERY_SECONDS = 30
+TIMEZONE = ZoneInfo(os.getenv("BOT_TIMEZONE", "Europe/Prague"))
 
 dp = Dispatcher()
 
@@ -34,9 +36,7 @@ def parse_reminder(text: str):
     parts = [part.strip() for part in text.split("|")]
 
     if len(parts) < 2 or len(parts) > 3:
-        raise ValueError(
-            "Use: YYYY-MM-DD HH:MM | title | repeat"
-        )
+        raise ValueError("Use: YYYY-MM-DD HH:MM | title | repeat")
 
     date_text, title = parts[0], parts[1]
     repeat = parts[2].lower() if len(parts) == 3 else "none"
@@ -48,11 +48,9 @@ def parse_reminder(text: str):
         reminder_at = datetime.strptime(
             date_text,
             "%Y-%m-%d %H:%M",
-        )
+        ).replace(tzinfo=TIMEZONE)
     except ValueError:
-        raise ValueError(
-            "Date format should be YYYY-MM-DD HH:MM"
-        )
+        raise ValueError("Date format should be YYYY-MM-DD HH:MM")
 
     return reminder_at, title, repeat
 
@@ -88,7 +86,7 @@ async def add_reminder(message: Message):
         await message.answer(str(exc))
         return
 
-    if reminder_at <= datetime.now():
+    if reminder_at <= datetime.now(TIMEZONE):
         await message.answer("That time is already in the past.")
         return
 
@@ -117,7 +115,7 @@ async def add_reminder(message: Message):
     await message.answer(
         f"Added ✅\n\n"
         f"{title}\n"
-        f"{reminder_at:%Y-%m-%d %H:%M}\n"
+        f"{reminder_at:%Y-%m-%d %H:%M %Z}\n"
         f"Repeat: {repeat_text}"
     )
 
@@ -142,10 +140,11 @@ async def list_reminders(message: Message):
 
     lines = ["📅 Your reminders:"]
     for reminder_id, title, reminder_at, repeat in rows:
+        reminder_dt = datetime.fromisoformat(reminder_at).astimezone(TIMEZONE)
         repeat_text = "yearly" if repeat == "yearly" else "once"
         lines.append(
             f"#{reminder_id} — {title} — "
-            f"{reminder_at[:16]} — {repeat_text}"
+            f"{reminder_dt:%Y-%m-%d %H:%M} — {repeat_text}"
         )
 
     await message.answer("\n".join(lines))
@@ -153,7 +152,7 @@ async def list_reminders(message: Message):
 
 @dp.message(Command("today"))
 async def today(message: Message):
-    today_value = datetime.now().date().isoformat()
+    today_value = datetime.now(TIMEZONE).date().isoformat()
 
     async with aiosqlite.connect(DB_NAME) as db:
         cursor = await db.execute(
@@ -175,8 +174,9 @@ async def today(message: Message):
 
     lines = ["Today:"]
     for reminder_id, title, reminder_at in rows:
+        reminder_dt = datetime.fromisoformat(reminder_at).astimezone(TIMEZONE)
         lines.append(
-            f"#{reminder_id} — {reminder_at[11:16]} — {title}"
+            f"#{reminder_id} — {reminder_dt:%H:%M} — {title}"
         )
 
     await message.answer("\n".join(lines))
@@ -211,7 +211,7 @@ async def delete_reminder(message: Message):
 
 async def deliver_reminders(bot: Bot):
     while True:
-        now = datetime.now().replace(second=0, microsecond=0)
+        now = datetime.now(TIMEZONE).replace(second=0, microsecond=0)
 
         async with aiosqlite.connect(DB_NAME) as db:
             cursor = await db.execute(
@@ -234,10 +234,7 @@ async def deliver_reminders(bot: Bot):
 
                 if repeat == "yearly":
                     old_date = datetime.fromisoformat(reminder_at)
-
-                    next_date = old_date.replace(
-                        year=old_date.year + 1
-                    )
+                    next_date = old_date.replace(year=old_date.year + 1)
 
                     await db.execute(
                         """
