@@ -1,11 +1,22 @@
-from bot import parse_datetime
+from datetime import datetime
+
+from app.recurrence import next_occurrence
 
 
-def test_parse_datetime():
-    value = parse_datetime("27.10.2026 09:00")
+def test_daily_repeat():
+    value = datetime(2026, 10, 27, 9, 0)
 
-    assert value.year == 2026
-    assert value.month == 10
-    assert value.day == 27
-    assert value.hour == 9
-    assert value.minute == 0
+    assert next_occurrence(value, "daily").day == 28
+
+
+def test_every_two_days():
+    value = datetime(2026, 10, 27, 9, 0)
+
+    assert next_occurrence(value, "2d").day == 29
+
+
+def test_custom_weekdays():
+    value = datetime(2026, 10, 27, 9, 0)
+    result = next_occurrence(value, "weekly:0,2,4")
+
+    assert result.weekday() == 2
