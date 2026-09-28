@@ -1,6 +1,8 @@
 import asyncio
 import html
 import os
+import re
+import tempfile
 from calendar import monthrange
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -11,876 +13,534 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-DB_NAME = "reminders.db"
-CHECK_EVERY_SECONDS = 30
-TIMEZONE = ZoneInfo(os.getenv("BOT_TIMEZONE", "Europe/Prague"))
+try:
+    from openai import AsyncOpenAI
+except ImportError:
+    AsyncOpenAI = None
 
+DB = "reminders.db"
+DEFAULT_TZ = os.getenv("BOT_TIMEZONE", "Europe/Prague")
+CHECK = 30
 dp = Dispatcher(storage=MemoryStorage())
 
 
-class AddReminder(StatesGroup):
-    waiting_title = State()
-    waiting_datetime = State()
+class Add(StatesGroup):
+    title = State()
+    category = State()
+    dt = State()
 
 
-LANGUAGES = {
-    "ru": ("🇷🇺", "Русский"),
-    "en": ("🇬🇧", "English"),
-    "it": ("🇮🇹", "Italiano"),
-    "uk": ("🇺🇦", "Українська"),
+class Edit(StatesGroup):
+    title = State()
+    dt = State()
+
+
+class Smart(StatesGroup):
+    text = State()
+
+
+LANGS = {"ru": ("🇷🇺", "Русский"), "en": ("🇬🇧", "English"), "it": ("🇮🇹", "Italiano"), "uk": ("🇺🇦", "Українська")}
+CAT = {
+    "birthday": ("🎂", {"ru": "Дни рождения", "en": "Birthdays", "it": "Compleanni", "uk": "Дні народження"}),
+    "work": ("💼", {"ru": "Работа", "en": "Work", "it": "Lavoro", "uk": "Робота"}),
+    "study": ("📚", {"ru": "Учёба", "en": "Study", "it": "Studio", "uk": "Навчання"}),
+    "payment": ("💳", {"ru": "Платежи", "en": "Payments", "it": "Pagamenti", "uk": "Платежі"}),
+    "trip": ("✈️", {"ru": "Поездки", "en": "Trips", "it": "Viaggi", "uk": "Поїздки"}),
+    "task": ("📝", {"ru": "Задачи", "en": "Tasks", "it": "Attività", "uk": "Завдання"}),
+    "health": ("💊", {"ru": "Здоровье", "en": "Health", "it": "Salute", "uk": "Здоров'я"}),
+    "other": ("📌", {"ru": "Другое", "en": "Other", "it": "Altro", "uk": "Інше"}),
 }
+TZS = {"prague": ("🇨🇿 Europe/Prague", "Europe/Prague"), "rome": ("🇮🇹 Europe/Rome", "Europe/Rome"), "kyiv": ("🇺🇦 Europe/Kyiv", "Europe/Kyiv"), "utc": ("🌍 UTC", "UTC")}
 
-TEXT = {
-    "ru": {
-        "choose_language": "Выбери язык бота:",
-        "welcome": "⏰ <b>Reminder Bot</b>\nЯ помогу не забыть важные даты и дела.",
-        "menu": "Главное меню",
-        "add": "➕ Добавить напоминание",
-        "list": "📅 Мои напоминания",
-        "today": "📌 Сегодня",
-        "language": "🌐 Язык",
-        "help": "ℹ️ Помощь",
-        "ask_title": "📝 Напиши, что нужно напомнить.",
-        "ask_datetime": "📅 Теперь введи дату и время.\nНапример: <code>27.10.2026 09:00</code>",
-        "choose_repeat": "🔁 Как часто повторять?",
-        "once": "Один раз",
-        "daily": "Каждый день",
-        "every_2_days": "Через день",
-        "weekly": "Через неделю",
-        "monthly": "Через месяц",
-        "yearly": "Через год",
-        "cancel": "✖️ Отмена",
-        "added": "✅ Напоминание добавлено",
-        "no_reminders": "📭 Пока нет активных напоминаний.",
-        "reminders": "📅 Твои напоминания:",
-        "nothing_today": "📭 На сегодня ничего нет.",
-        "deleted": "🗑 Удалено.",
-        "not_found": "Не нашёл такое напоминание.",
-        "past": "Это время уже прошло.",
-        "bad_datetime": "Не понял дату. Напиши так: <code>27.10.2026 09:00</code>",
-        "language_saved": "✅ Язык сохранён.",
-        "back": "↩️ Назад",
-        "delete": "🗑 Удалить",
-        "delete_hint": "Нажми кнопку рядом с напоминанием, чтобы удалить его.",
-        "help_text": (
-            "Здесь можно хранить важные даты и задачи.\n\n"
-            "➕ <b>Добавить</b> — создай напоминание шаг за шагом.\n"
-            "📅 <b>Мои напоминания</b> — список всех активных.\n"
-            "📌 <b>Сегодня</b> — что запланировано на сегодня.\n"
-            "🌐 <b>Язык</b> — сменить язык бота."
-        ),
-        "repeat_label": {
-            "once": "один раз",
-            "daily": "каждый день",
-            "every_2_days": "через день",
-            "weekly": "через неделю",
-            "monthly": "через месяц",
-            "yearly": "через год",
-        },
-    },
-    "en": {
-        "choose_language": "Choose your bot language:",
-        "welcome": "⏰ <b>Reminder Bot</b>\nI'll help you remember important dates and tasks.",
-        "menu": "Main menu",
-        "add": "➕ Add reminder",
-        "list": "📅 My reminders",
-        "today": "📌 Today",
-        "language": "🌐 Language",
-        "help": "ℹ️ Help",
-        "ask_title": "📝 What should I remind you about?",
-        "ask_datetime": "📅 Now enter the date and time.\nExample: <code>27.10.2026 09:00</code>",
-        "choose_repeat": "🔁 How often should it repeat?",
-        "once": "Once",
-        "daily": "Every day",
-        "every_2_days": "Every 2 days",
-        "weekly": "Every week",
-        "monthly": "Every month",
-        "yearly": "Every year",
-        "cancel": "✖️ Cancel",
-        "added": "✅ Reminder added",
-        "no_reminders": "📭 You have no active reminders.",
-        "reminders": "📅 Your reminders:",
-        "nothing_today": "📭 Nothing planned for today.",
-        "deleted": "🗑 Deleted.",
-        "not_found": "I couldn't find that reminder.",
-        "past": "That time is already in the past.",
-        "bad_datetime": "I couldn't read the date. Use: <code>27.10.2026 09:00</code>",
-        "language_saved": "✅ Language saved.",
-        "back": "↩️ Back",
-        "delete": "🗑 Delete",
-        "delete_hint": "Use the button next to a reminder to delete it.",
-        "help_text": (
-            "Use this bot for important dates and tasks.\n\n"
-            "➕ <b>Add reminder</b> — create one step by step.\n"
-            "📅 <b>My reminders</b> — see active reminders.\n"
-            "📌 <b>Today</b> — see today's reminders.\n"
-            "🌐 <b>Language</b> — change the bot language."
-        ),
-        "repeat_label": {
-            "once": "once",
-            "daily": "every day",
-            "every_2_days": "every 2 days",
-            "weekly": "every week",
-            "monthly": "every month",
-            "yearly": "every year",
-        },
-    },
-    "it": {
-        "choose_language": "Scegli la lingua del bot:",
-        "welcome": "⏰ <b>Reminder Bot</b>\nTi aiuterò a ricordare date e attività importanti.",
-        "menu": "Menu principale",
-        "add": "➕ Aggiungi promemoria",
-        "list": "📅 I miei promemoria",
-        "today": "📌 Oggi",
-        "language": "🌐 Lingua",
-        "help": "ℹ️ Aiuto",
-        "ask_title": "📝 Cosa devo ricordarti?",
-        "ask_datetime": "📅 Inserisci data e ora.\nEsempio: <code>27.10.2026 09:00</code>",
-        "choose_repeat": "🔁 Quanto spesso ripetere?",
-        "once": "Una volta",
-        "daily": "Ogni giorno",
-        "every_2_days": "Ogni 2 giorni",
-        "weekly": "Ogni settimana",
-        "monthly": "Ogni mese",
-        "yearly": "Ogni anno",
-        "cancel": "✖️ Annulla",
-        "added": "✅ Promemoria aggiunto",
-        "no_reminders": "📭 Non hai promemoria attivi.",
-        "reminders": "📅 I tuoi promemoria:",
-        "nothing_today": "📭 Niente in programma per oggi.",
-        "deleted": "🗑 Eliminato.",
-        "not_found": "Non ho trovato quel promemoria.",
-        "past": "Questo orario è già passato.",
-        "bad_datetime": "Formato data: <code>27.10.2026 09:00</code>",
-        "language_saved": "✅ Lingua salvata.",
-        "back": "↩️ Indietro",
-        "delete": "🗑 Elimina",
-        "delete_hint": "Usa il pulsante accanto al promemoria per eliminarlo.",
-        "help_text": (
-            "Usa il bot per date e attività importanti.\n\n"
-            "➕ <b>Aggiungi</b> — crea un promemoria passo dopo passo.\n"
-            "📅 <b>I miei promemoria</b> — mostra quelli attivi.\n"
-            "📌 <b>Oggi</b> — mostra quelli di oggi.\n"
-            "🌐 <b>Lingua</b> — cambia la lingua del bot."
-        ),
-        "repeat_label": {
-            "once": "una volta",
-            "daily": "ogni giorno",
-            "every_2_days": "ogni 2 giorni",
-            "weekly": "ogni settimana",
-            "monthly": "ogni mese",
-            "yearly": "ogni anno",
-        },
-    },
-    "uk": {
-        "choose_language": "Оберіть мову бота:",
-        "welcome": "⏰ <b>Reminder Bot</b>\nЯ допоможу не забувати важливі дати та справи.",
-        "menu": "Головне меню",
-        "add": "➕ Додати нагадування",
-        "list": "📅 Мої нагадування",
-        "today": "📌 Сьогодні",
-        "language": "🌐 Мова",
-        "help": "ℹ️ Допомога",
-        "ask_title": "📝 Що потрібно нагадати?",
-        "ask_datetime": "📅 Введи дату та час.\nНаприклад: <code>27.10.2026 09:00</code>",
-        "choose_repeat": "🔁 Як часто повторювати?",
-        "once": "Один раз",
-        "daily": "Щодня",
-        "every_2_days": "Через день",
-        "weekly": "Через тиждень",
-        "monthly": "Через місяць",
-        "yearly": "Через рік",
-        "cancel": "✖️ Скасувати",
-        "added": "✅ Нагадування додано",
-        "no_reminders": "📭 У тебе немає активних нагадувань.",
-        "reminders": "📅 Твої нагадування:",
-        "nothing_today": "📭 На сьогодні нічого немає.",
-        "deleted": "🗑 Видалено.",
-        "not_found": "Не знайшов такого нагадування.",
-        "past": "Цей час уже минув.",
-        "bad_datetime": "Формат дати: <code>27.10.2026 09:00</code>",
-        "language_saved": "✅ Мову збережено.",
-        "back": "↩️ Назад",
-        "delete": "🗑 Видалити",
-        "delete_hint": "Натисни кнопку біля нагадування, щоб його видалити.",
-        "help_text": (
-            "Використовуй бота для важливих дат і справ.\n\n"
-            "➕ <b>Додати</b> — створи нагадування крок за кроком.\n"
-            "📅 <b>Мої нагадування</b> — список активних.\n"
-            "📌 <b>Сьогодні</b> — нагадування на сьогодні.\n"
-            "🌐 <b>Мова</b> — зміни мову бота."
-        ),
-        "repeat_label": {
-            "once": "один раз",
-            "daily": "щодня",
-            "every_2_days": "через день",
-            "weekly": "через тиждень",
-            "monthly": "через місяць",
-            "yearly": "щороку",
-        },
-    },
+UI = {
+"ru":{"welcome":"⏰ <b>Reminder Bot</b>\nЯ помогу не забыть важные даты и дела.","menu":"Главное меню","add":"➕ Добавить","list":"📅 Мои","today":"📌 Сегодня","lang":"🌐 Язык","help":"ℹ️ Помощь","settings":"⚙️ Настройки","smart":"✨ Умный ввод","export":"📤 Экспорт","title":"📝 Что напомнить?","cat":"🏷 Категория","dt":"📅 Дата и время: <code>27.10.2026 09:00</code>","repeat":"🔁 Повтор","once":"Один раз","daily":"Каждый день","2d":"Через 2 дня","week":"Через неделю","month":"Через месяц","year":"Через год","cancel":"✖️ Отмена","added":"✅ Добавлено","empty":"📭 Пока пусто.","deleted":"🗑 Удалено.","notfound":"Не найдено.","past":"Это время уже прошло.","back":"↩️ Назад","edit":"✏️ Изменить","share":"🔗 Поделиться","snooze10":"⏰ 10 мин","snooze60":"⏰ 1 час","snooze1440":"📅 Завтра","done":"✅ Готово","settings_title":"⚙️ Настройки","tz":"🌍 Часовой пояс","digest":"🌅 Утренний обзор","digest_on":"✅ Обзор включён на 09:00.","digest_off":"Обзор выключен.","choose_tz":"Выбери часовой пояс","tz_saved":"✅ Сохранено.","smart_prompt":"✨ Напиши обычной фразой, например: <code>через 3 дня в 19:00 купить подарок маме</code>","help_text":"➕ Добавляй напоминания шаг за шагом.\n✨ Умный ввод понимает обычные фразы.\n🔔 После уведомления можно отложить его.\n📤 Экспорт создаёт .ics для календаря.\n🔗 Поделиться даёт ссылку для общего напоминания.","digest_title":"🌅 Сегодня","nothing":"На сегодня ничего нет.","repeat_names":{"once":"разово","daily":"ежедневно","2d":"раз в 2 дня","week":"еженедельно","month":"ежемесячно","year":"ежегодно"},"lang_saved":"✅ Язык сохранён."},
+"en":{"welcome":"⏰ <b>Reminder Bot</b>\nI'll help you remember important dates and tasks.","menu":"Main menu","add":"➕ Add","list":"📅 My reminders","today":"📌 Today","lang":"🌐 Language","help":"ℹ️ Help","settings":"⚙️ Settings","smart":"✨ Smart input","export":"📤 Export","title":"📝 What should I remind you about?","cat":"🏷 Category","dt":"📅 Date and time: <code>27.10.2026 09:00</code>","repeat":"🔁 Repeat","once":"Once","daily":"Every day","2d":"Every 2 days","week":"Every week","month":"Every month","year":"Every year","cancel":"✖️ Cancel","added":"✅ Added","empty":"📭 Nothing here yet.","deleted":"🗑 Deleted.","notfound":"Not found.","past":"That time is already in the past.","back":"↩️ Back","edit":"✏️ Edit","share":"🔗 Share","snooze10":"⏰ 10 min","snooze60":"⏰ 1 hour","snooze1440":"📅 Tomorrow","done":"✅ Done","settings_title":"⚙️ Settings","tz":"🌍 Time zone","digest":"🌅 Morning digest","digest_on":"✅ Digest enabled for 09:00.","digest_off":"Digest disabled.","choose_tz":"Choose your time zone","tz_saved":"✅ Saved.","smart_prompt":"✨ Write naturally, for example: <code>in 3 days at 19:00 buy a gift for mom</code>","help_text":"➕ Add reminders step by step.\n✨ Smart input understands normal phrases.\n🔔 Snooze notifications.\n📤 Export .ics.\n🔗 Share reminders with someone else.","digest_title":"🌅 Today","nothing":"Nothing planned for today.","repeat_names":{"once":"once","daily":"daily","2d":"every 2 days","week":"weekly","month":"monthly","year":"yearly"},"lang_saved":"✅ Language saved."},
+"it":{"welcome":"⏰ <b>Reminder Bot</b>\nTi aiuterò a ricordare date e attività importanti.","menu":"Menu principale","add":"➕ Aggiungi","list":"📅 I miei","today":"📌 Oggi","lang":"🌐 Lingua","help":"ℹ️ Aiuto","settings":"⚙️ Impostazioni","smart":"✨ Input smart","export":"📤 Esporta","title":"📝 Cosa devo ricordarti?","cat":"🏷 Categoria","dt":"📅 Data e ora: <code>27.10.2026 09:00</code>","repeat":"🔁 Ripetizione","once":"Una volta","daily":"Ogni giorno","2d":"Ogni 2 giorni","week":"Ogni settimana","month":"Ogni mese","year":"Ogni anno","cancel":"✖️ Annulla","added":"✅ Aggiunto","empty":"📭 Ancora niente.","deleted":"🗑 Eliminato.","notfound":"Non trovato.","past":"Questo orario è già passato.","back":"↩️ Indietro","edit":"✏️ Modifica","share":"🔗 Condividi","snooze10":"⏰ 10 min","snooze60":"⏰ 1 ora","snooze1440":"📅 Domani","done":"✅ Fatto","settings_title":"⚙️ Impostazioni","tz":"🌍 Fuso orario","digest":"🌅 Riepilogo","digest_on":"✅ Riepilogo attivo alle 09:00.","digest_off":"Riepilogo disattivato.","choose_tz":"Scegli il fuso orario","tz_saved":"✅ Salvato.","smart_prompt":"✨ Scrivi in modo naturale, per esempio: <code>tra 3 giorni alle 19:00 compra un regalo per mamma</code>","help_text":"➕ Aggiungi passo dopo passo.\n✨ Input smart per frasi normali.\n🔔 Posticipa le notifiche.\n📤 Esporta .ics.\n🔗 Condividi promemoria.","digest_title":"🌅 Oggi","nothing":"Niente per oggi.","repeat_names":{"once":"una volta","daily":"giornaliero","2d":"ogni 2 giorni","week":"settimanale","month":"mensile","year":"annuale"},"lang_saved":"✅ Lingua salvata."},
+"uk":{"welcome":"⏰ <b>Reminder Bot</b>\nЯ допоможу не забувати важливі дати та справи.","menu":"Головне меню","add":"➕ Додати","list":"📅 Мої","today":"📌 Сьогодні","lang":"🌐 Мова","help":"ℹ️ Допомога","settings":"⚙️ Налаштування","smart":"✨ Розумний ввід","export":"📤 Експорт","title":"📝 Що потрібно нагадати?","cat":"🏷 Категорія","dt":"📅 Дата і час: <code>27.10.2026 09:00</code>","repeat":"🔁 Повтор","once":"Один раз","daily":"Щодня","2d":"Через 2 дні","week":"Щотижня","month":"Щомісяця","year":"Щороку","cancel":"✖️ Скасувати","added":"✅ Додано","empty":"📭 Поки порожньо.","deleted":"🗑 Видалено.","notfound":"Не знайдено.","past":"Цей час уже минув.","back":"↩️ Назад","edit":"✏️ Змінити","share":"🔗 Поділитися","snooze10":"⏰ 10 хв","snooze60":"⏰ 1 год","snooze1440":"📅 Завтра","done":"✅ Готово","settings_title":"⚙️ Налаштування","tz":"🌍 Часовий пояс","digest":"🌅 Ранковий огляд","digest_on":"✅ Огляд увімкнено на 09:00.","digest_off":"Огляд вимкнено.","choose_tz":"Обери часовий пояс","tz_saved":"✅ Збережено.","smart_prompt":"✨ Напиши звичайною фразою, наприклад: <code>через 3 дні о 19:00 купити подарунок мамі</code>","help_text":"➕ Додавай крок за кроком.\n✨ Розумний ввід розуміє звичайні фрази.\n🔔 Відкладай нагадування.\n📤 Експорт .ics.\n🔗 Ділися нагадуваннями.","digest_title":"🌅 Сьогодні","nothing":"На сьогодні нічого немає.","repeat_names":{"once":"разово","daily":"щодня","2d":"раз на 2 дні","week":"щотижня","month":"щомісяця","year":"щорічно"},"lang_saved":"✅ Мову збережено."}
 }
 
 
-def language_keyboard():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="🇷🇺 Русский", callback_data="lang:ru"),
-                InlineKeyboardButton(text="🇬🇧 English", callback_data="lang:en"),
-            ],
-            [
-                InlineKeyboardButton(text="🇮🇹 Italiano", callback_data="lang:it"),
-                InlineKeyboardButton(text="🇺🇦 Українська", callback_data="lang:uk"),
-            ],
-        ]
-    )
+def texts(lang): return UI.get(lang, UI["en"])
 
 
-def menu_keyboard(language: str):
-    t = TEXT[language]
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=t["add"], callback_data="menu:add")],
-            [
-                InlineKeyboardButton(text=t["list"], callback_data="menu:list"),
-                InlineKeyboardButton(text=t["today"], callback_data="menu:today"),
-            ],
-            [
-                InlineKeyboardButton(text=t["language"], callback_data="menu:language"),
-                InlineKeyboardButton(text=t["help"], callback_data="menu:help"),
-            ],
-        ]
-    )
+def lang_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🇷🇺 Русский", callback_data="lang:ru"), InlineKeyboardButton(text="🇬🇧 English", callback_data="lang:en")],
+        [InlineKeyboardButton(text="🇮🇹 Italiano", callback_data="lang:it"), InlineKeyboardButton(text="🇺🇦 Українська", callback_data="lang:uk")],
+    ])
 
 
-def back_keyboard(language: str):
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=TEXT[language]["back"], callback_data="menu:home")]
-        ]
-    )
+def main_kb(lang):
+    t = texts(lang)
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t["add"], callback_data="menu:add")],
+        [InlineKeyboardButton(text=t["list"], callback_data="menu:list"), InlineKeyboardButton(text=t["today"], callback_data="menu:today")],
+        [InlineKeyboardButton(text=t["smart"], callback_data="menu:smart"), InlineKeyboardButton(text=t["export"], callback_data="menu:export")],
+        [InlineKeyboardButton(text=t["settings"], callback_data="menu:settings"), InlineKeyboardButton(text=t["lang"], callback_data="menu:lang")],
+        [InlineKeyboardButton(text=t["help"], callback_data="menu:help")],
+    ])
 
 
-def repeat_keyboard(language: str):
-    t = TEXT[language]
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=t["once"], callback_data="repeat:once"),
-                InlineKeyboardButton(text=t["daily"], callback_data="repeat:daily"),
-            ],
-            [
-                InlineKeyboardButton(text=t["every_2_days"], callback_data="repeat:every_2_days"),
-                InlineKeyboardButton(text=t["weekly"], callback_data="repeat:weekly"),
-            ],
-            [
-                InlineKeyboardButton(text=t["monthly"], callback_data="repeat:monthly"),
-                InlineKeyboardButton(text=t["yearly"], callback_data="repeat:yearly"),
-            ],
-            [InlineKeyboardButton(text=t["cancel"], callback_data="add:cancel")],
-        ]
-    )
+def back_kb(lang):
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=texts(lang)["back"], callback_data="menu:home")]])
 
 
-async def init_db():
-    async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS reminders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                telegram_id INTEGER NOT NULL,
-                title TEXT NOT NULL,
-                reminder_at TEXT NOT NULL,
-                repeat TEXT NOT NULL DEFAULT 'once',
-                sent_at TEXT
-            )
-            """
-        )
-        await db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                telegram_id INTEGER PRIMARY KEY,
-                language TEXT NOT NULL
-            )
-            """
-        )
+def cat_kb(lang):
+    rows, row = [], []
+    for k, (e, labels) in CAT.items():
+        row.append(InlineKeyboardButton(text=f"{e} {labels[lang]}", callback_data=f"cat:{k}"))
+        if len(row) == 2:
+            rows.append(row); row=[]
+    if row: rows.append(row)
+    rows.append([InlineKeyboardButton(text=texts(lang)["cancel"], callback_data="cancel")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def repeat_kb(lang):
+    t = texts(lang)
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t["once"], callback_data="rep:once"), InlineKeyboardButton(text=t["daily"], callback_data="rep:daily")],
+        [InlineKeyboardButton(text=t["2d"], callback_data="rep:2d"), InlineKeyboardButton(text=t["week"], callback_data="rep:week")],
+        [InlineKeyboardButton(text=t["month"], callback_data="rep:month"), InlineKeyboardButton(text=t["year"], callback_data="rep:year")],
+        [InlineKeyboardButton(text=t["cancel"], callback_data="cancel")],
+    ])
+
+
+def action_kb(lang, rid):
+    t = texts(lang)
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t["snooze10"], callback_data=f"snooze:10:{rid}"), InlineKeyboardButton(text=t["snooze60"], callback_data=f"snooze:60:{rid}")],
+        [InlineKeyboardButton(text=t["snooze1440"], callback_data=f"snooze:1440:{rid}"), InlineKeyboardButton(text=t["done"], callback_data=f"done:{rid}")],
+    ])
+
+
+def list_actions(lang, rid):
+    t = texts(lang)
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"{t['edit']} #{rid}", callback_data=f"edit:{rid}"), InlineKeyboardButton(text=f"{t['delete']} #{rid}", callback_data=f"delete:{rid}")],
+        [InlineKeyboardButton(text=f"{t['share']} #{rid}", callback_data=f"share:{rid}")],
+    ])
+
+
+def settings_kb(lang, digest):
+    t=texts(lang)
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t["tz"], callback_data="settings:tz")],
+        [InlineKeyboardButton(text=f"{t['digest']} {'✅' if digest else '❌'}", callback_data="settings:digest")],
+        [InlineKeyboardButton(text=t["back"], callback_data="menu:home")],
+    ])
+
+
+def tz_kb(lang):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        *[[InlineKeyboardButton(text=label, callback_data=f"tz:{key}")] for key,(label,_) in TZS.items()],
+        [InlineKeyboardButton(text=texts(lang)["back"], callback_data="menu:settings")]
+    ])
+
+
+async def db_init():
+    async with aiosqlite.connect(DB) as db:
+        await db.execute("CREATE TABLE IF NOT EXISTS users (telegram_id INTEGER PRIMARY KEY, language TEXT NOT NULL DEFAULT 'en', timezone TEXT NOT NULL DEFAULT ?, digest_enabled INTEGER NOT NULL DEFAULT 0, digest_hour INTEGER NOT NULL DEFAULT 9, last_digest_date TEXT)", (DEFAULT_TZ,))
+        await db.execute("CREATE TABLE IF NOT EXISTS reminders (id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id INTEGER NOT NULL, title TEXT NOT NULL, reminder_at TEXT NOT NULL, repeat TEXT NOT NULL DEFAULT 'once', category TEXT NOT NULL DEFAULT 'other', sent_at TEXT, share_token TEXT)")
+        await db.execute("CREATE TABLE IF NOT EXISTS shared_members (reminder_id INTEGER NOT NULL, telegram_id INTEGER NOT NULL, joined_at TEXT NOT NULL, PRIMARY KEY(reminder_id, telegram_id))")
+        for table,col,definition in [
+            ("reminders","category","TEXT NOT NULL DEFAULT 'other'"),
+            ("reminders","share_token","TEXT"),
+            ("users","timezone",f"TEXT NOT NULL DEFAULT '{DEFAULT_TZ}'"),
+            ("users","digest_enabled","INTEGER NOT NULL DEFAULT 0"),
+            ("users","digest_hour","INTEGER NOT NULL DEFAULT 9"),
+            ("users","last_digest_date","TEXT")
+        ]:
+            c=await db.execute(f"PRAGMA table_info({table})")
+            cols={r[1] for r in await c.fetchall()}
+            if col not in cols:
+                await db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {definition}")
         await db.commit()
 
 
-async def get_language(telegram_id: int) -> str | None:
-    async with aiosqlite.connect(DB_NAME) as db:
-        cursor = await db.execute(
-            "SELECT language FROM users WHERE telegram_id = ?",
-            (telegram_id,),
-        )
-        row = await cursor.fetchone()
-    return row[0] if row else None
+async def user(uid):
+    async with aiosqlite.connect(DB) as db:
+        c=await db.execute("SELECT language,timezone,digest_enabled,digest_hour,last_digest_date FROM users WHERE telegram_id=?",(uid,))
+        r=await c.fetchone()
+    if not r: return {"language":"en","timezone":DEFAULT_TZ,"digest_enabled":0,"digest_hour":9,"last_digest_date":None}
+    return {"language":r[0],"timezone":r[1],"digest_enabled":r[2],"digest_hour":r[3],"last_digest_date":r[4]}
 
 
-async def set_language(telegram_id: int, language: str):
-    async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute(
-            """
-            INSERT INTO users (telegram_id, language)
-            VALUES (?, ?)
-            ON CONFLICT(telegram_id)
-            DO UPDATE SET language = excluded.language
-            """,
-            (telegram_id, language),
-        )
+async def set_lang(uid, lang):
+    async with aiosqlite.connect(DB) as db:
+        await db.execute("INSERT INTO users(telegram_id,language,timezone) VALUES(?,?,?) ON CONFLICT(telegram_id) DO UPDATE SET language=excluded.language",(uid,lang,DEFAULT_TZ))
         await db.commit()
 
 
-async def show_home(message: Message, language: str, edit: bool = False):
-    text = f"{TEXT[language]['welcome']}\n\n<b>{TEXT[language]['menu']}</b>"
-
-    if edit:
-        await message.edit_text(
-            text,
-            reply_markup=menu_keyboard(language),
-            parse_mode="HTML",
-        )
-    else:
-        await message.answer(
-            text,
-            reply_markup=menu_keyboard(language),
-            parse_mode="HTML",
-        )
+def tz_of(u):
+    try: return ZoneInfo(u["timezone"])
+    except: return ZoneInfo(DEFAULT_TZ)
 
 
-def parse_datetime(text: str):
-    return datetime.strptime(
-        text.strip(),
-        "%d.%m.%Y %H:%M",
-    ).replace(tzinfo=TIMEZONE)
+async def home(msg, lang, edit=False):
+    text=f"{texts(lang)['welcome']}\n\n<b>{texts(lang)['menu']}</b>"
+    if edit: await msg.edit_text(text, reply_markup=main_kb(lang), parse_mode="HTML")
+    else: await msg.answer(text, reply_markup=main_kb(lang), parse_mode="HTML")
 
 
-def next_occurrence(dt: datetime, repeat: str) -> datetime | None:
-    if repeat == "once":
-        return None
+def parse_dt(s,tz):
+    return datetime.strptime(s.strip(),"%d.%m.%Y %H:%M").replace(tzinfo=tz)
 
-    if repeat == "daily":
-        return dt + timedelta(days=1)
 
-    if repeat == "every_2_days":
-        return dt + timedelta(days=2)
-
-    if repeat == "weekly":
-        return dt + timedelta(days=7)
-
-    if repeat == "monthly":
-        next_month = 1 if dt.month == 12 else dt.month + 1
-        next_year = dt.year + 1 if dt.month == 12 else dt.year
-        day = min(dt.day, monthrange(next_year, next_month)[1])
-        return dt.replace(year=next_year, month=next_month, day=day)
-
-    if repeat == "yearly":
-        day = dt.day
-        if dt.month == 2 and dt.day == 29:
-            day = 28
-        return dt.replace(year=dt.year + 1, day=day)
-
+def next_dt(dt, repeat):
+    if repeat=="once": return None
+    if repeat=="daily": return dt+timedelta(days=1)
+    if repeat=="2d": return dt+timedelta(days=2)
+    if repeat=="week": return dt+timedelta(days=7)
+    if repeat=="month":
+        m=1 if dt.month==12 else dt.month+1; y=dt.year+1 if dt.month==12 else dt.year
+        return dt.replace(year=y,month=m,day=min(dt.day,monthrange(y,m)[1]))
+    if repeat=="year":
+        return dt.replace(year=dt.year+1,day=28 if dt.month==2 and dt.day==29 else dt.day)
     return None
 
 
+def parse_smart(text,tz):
+    now=datetime.now(tz)
+    tm=re.search(r"\b(?:в|о|at|alle|о)\s*(\d{1,2})(?::(\d{2}))?\b", text.lower())
+    hour=int(tm.group(1)) if tm else 9
+    minute=int(tm.group(2) or 0) if tm else 0
+    pats=[
+        (r"(?:через|after|in|tra)\s+(\d+)\s*(?:дн|дня|дней|days?|giorni|дні)","day"),
+        (r"(?:через|after|in|tra)\s+(\d+)\s*(?:нед|неделю|недель|weeks?|settimane|тиж\w+)","week"),
+        (r"(?:через|after|in|tra)\s+(\d+)\s*(?:месяц|месяца|месяцев|months?|mesi|місяц\w+)","month"),
+        (r"(?:через|after|in|tra)\s+(\d+)\s*(?:год|года|годов|years?|anni|рок\w+)","year"),
+    ]
+    for pat,unit in pats:
+        m=re.search(pat,text.lower())
+        if not m: continue
+        n=int(m.group(1)); title=re.sub(pat,"",text,flags=re.I).strip(" ,")
+        if unit=="day": target=now+timedelta(days=n)
+        elif unit=="week": target=now+timedelta(days=7*n)
+        elif unit=="month":
+            x=now.month-1+n; y=now.year+x//12; mo=x%12+1; target=now.replace(year=y,month=mo,day=min(now.day,monthrange(y,mo)[1]))
+        else: target=now.replace(year=now.year+n,day=28 if now.month==2 and now.day==29 else now.day)
+        return target.replace(hour=hour,minute=minute,second=0,microsecond=0),title or text
+    m=re.search(r"\b(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b",text)
+    if m:
+        d,mo,y=map(int,m.groups()); target=datetime(y,mo,d,hour,minute,tzinfo=tz)
+        return target,text.replace(m.group(0),"").strip(" ,")
+    return None
+
+
+async def ai_parse(text,tz,lang):
+    local=parse_smart(text,tz)
+    key=os.getenv("OPENAI_API_KEY")
+    if not key or AsyncOpenAI is None:
+        return local, False
+    client=AsyncOpenAI(api_key=key)
+    model=os.getenv("OPENAI_MODEL","gpt-4.1-mini")
+    prompt=("Return JSON with title, datetime, repeat, category. repeat=once,daily,2d,week,month,year; "
+            "category=birthday,work,study,payment,trip,task,health,other. "
+            f"Now={datetime.now(tz):%Y-%m-%d %H:%M}; timezone={tz.key}; text={text}")
+    r=await client.chat.completions.create(model=model,messages=[{"role":"system","content":"Parse a reminder."},{"role":"user","content":prompt}],temperature=0,response_format={"type":"json_object"})
+    d=r.choices[0].message.content
+    import json
+    d=json.loads(d)
+    dt=datetime.fromisoformat(d["datetime"]).replace(tzinfo=tz)
+    return (dt,d["title"],d.get("repeat","once"),d.get("category","other")), True
+
+
+async def recipients(rid,owner):
+    async with aiosqlite.connect(DB) as db:
+        c=await db.execute("SELECT telegram_id FROM shared_members WHERE reminder_id=?",(rid,))
+        rows=await c.fetchall()
+    return list({owner,*[x[0] for x in rows]})
+
+
+async def export_ics(uid):
+    async with aiosqlite.connect(DB) as db:
+        c=await db.execute("SELECT DISTINCT r.id,r.title,r.reminder_at,r.repeat FROM reminders r LEFT JOIN shared_members s ON s.reminder_id=r.id WHERE r.telegram_id=? OR s.telegram_id=? ORDER BY r.reminder_at",(uid,uid))
+        rows=await c.fetchall()
+    out=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Davyd//ReminderBot//EN"]
+    for rid,title,dt,rep in rows:
+        u=datetime.fromisoformat(dt).astimezone(timezone.utc)
+        out += ["BEGIN:VEVENT",f"UID:{rid}@reminderbot",f"DTSTAMP:{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}",f"DTSTART:{u:%Y%m%dT%H%M%SZ}",f"SUMMARY:{title.replace(',','\\,').replace(';','\\;')}"]
+        rr={"daily":"RRULE:FREQ=DAILY","2d":"RRULE:FREQ=DAILY;INTERVAL=2","week":"RRULE:FREQ=WEEKLY","month":"RRULE:FREQ=MONTHLY","year":"RRULE:FREQ=YEARLY"}.get(rep)
+        if rr: out.append(rr)
+        out.append("END:VEVENT")
+    out.append("END:VCALENDAR")
+    path=os.path.join(tempfile.gettempdir(),f"reminders_{uid}.ics")
+    open(path,"w",encoding="utf-8").write("\r\n".join(out))
+    return path
+
+
 @dp.message(Command("start"))
-async def start(message: Message, state: FSMContext):
+async def start(m:Message,state:FSMContext):
     await state.clear()
+    lang=(await user(m.from_user.id))["language"]
+    if not await has_user(m.from_user.id):
+        await m.answer("⏰ <b>Reminder Bot</b>\n\nВыберите язык / Choose your language / Scegli la lingua / Оберіть мову:",reply_markup=lang_kb(),parse_mode="HTML"); return
+    await home(m,lang)
 
-    language = await get_language(message.from_user.id)
 
-    if language is None:
-        await message.answer(
-            "⏰ <b>Reminder Bot</b>\n\n"
-            "Выберите язык / Choose your language\n"
-            "Scegli la lingua / Оберіть мову:",
-            reply_markup=language_keyboard(),
-            parse_mode="HTML",
-        )
-        return
-
-    await show_home(message, language)
+async def has_user(uid):
+    async with aiosqlite.connect(DB) as db:
+        c=await db.execute("SELECT 1 FROM users WHERE telegram_id=?",(uid,))
+        return await c.fetchone() is not None
 
 
 @dp.callback_query(F.data.startswith("lang:"))
-async def language_selected(callback: CallbackQuery, state: FSMContext):
-    language = callback.data.split(":", 1)[1]
-
-    if language not in LANGUAGES:
-        await callback.answer()
-        return
-
-    await state.clear()
-    await set_language(callback.from_user.id, language)
-
-    await callback.message.edit_text(
-        TEXT[language]["language_saved"],
-        parse_mode="HTML",
-    )
-    await show_home(callback.message, language)
-    await callback.answer()
+async def lang_cb(c:CallbackQuery):
+    lang=c.data.split(":")[1]; await set_lang(c.from_user.id,lang)
+    await c.message.edit_text(texts(lang)["lang_saved"]); await home(c.message,lang); await c.answer()
 
 
-@dp.callback_query(F.data == "menu:home")
-async def menu_home(callback: CallbackQuery, state: FSMContext):
-    await state.clear()
-    language = await get_language(callback.from_user.id) or "en"
-    await show_home(callback.message, language, edit=True)
-    await callback.answer()
+@dp.callback_query(F.data=="menu:home")
+async def home_cb(c:CallbackQuery,state:FSMContext):
+    await state.clear(); lang=(await user(c.from_user.id))["language"]; await home(c.message,lang,True); await c.answer()
 
 
-@dp.callback_query(F.data == "menu:add")
-async def menu_add(callback: CallbackQuery, state: FSMContext):
-    language = await get_language(callback.from_user.id) or "en"
-    await state.set_state(AddReminder.waiting_title)
-
-    await callback.message.edit_text(
-        f"➕ <b>{TEXT[language]['add']}</b>\n\n{TEXT[language]['ask_title']}",
-        reply_markup=back_keyboard(language),
-        parse_mode="HTML",
-    )
-    await callback.answer()
+@dp.callback_query(F.data=="menu:add")
+async def add_cb(c:CallbackQuery,state:FSMContext):
+    lang=(await user(c.from_user.id))["language"]; await state.set_state(Add.title)
+    await c.message.edit_text(texts(lang)["title"],reply_markup=back_kb(lang)); await c.answer()
 
 
-@dp.message(AddReminder.waiting_title)
-async def reminder_title(message: Message, state: FSMContext):
-    language = await get_language(message.from_user.id) or "en"
-
-    title = message.text.strip()
-
-    if not title:
-        await message.answer(TEXT[language]["ask_title"])
-        return
-
-    await state.update_data(title=title)
-    await state.set_state(AddReminder.waiting_datetime)
-
-    await message.answer(
-        TEXT[language]["ask_datetime"],
-        reply_markup=back_keyboard(language),
-        parse_mode="HTML",
-    )
+@dp.message(Add.title)
+async def add_title(m:Message,state:FSMContext):
+    lang=(await user(m.from_user.id))["language"]; await state.update_data(title=m.text.strip()); await state.set_state(Add.category)
+    await m.answer(texts(lang)["cat"],reply_markup=cat_kb(lang))
 
 
-@dp.message(AddReminder.waiting_datetime)
-async def reminder_datetime(message: Message, state: FSMContext):
-    language = await get_language(message.from_user.id) or "en"
-
-    try:
-        reminder_at = parse_datetime(message.text)
-    except ValueError:
-        await message.answer(
-            TEXT[language]["bad_datetime"],
-            parse_mode="HTML",
-        )
-        return
-
-    if reminder_at <= datetime.now(TIMEZONE):
-        await message.answer(TEXT[language]["past"])
-        return
-
-    await state.update_data(reminder_at=reminder_at.isoformat())
-    await message.answer(
-        TEXT[language]["choose_repeat"],
-        reply_markup=repeat_keyboard(language),
-    )
+@dp.callback_query(Add.category,F.data.startswith("cat:"))
+async def add_cat(c:CallbackQuery,state:FSMContext):
+    lang=(await user(c.from_user.id))["language"]; await state.update_data(category=c.data.split(":")[1]); await state.set_state(Add.dt)
+    await c.message.edit_text(texts(lang)["dt"],reply_markup=back_kb(lang),parse_mode="HTML"); await c.answer()
 
 
-@dp.callback_query(F.data == "add:cancel")
-async def cancel_add(callback: CallbackQuery, state: FSMContext):
-    await state.clear()
-    language = await get_language(callback.from_user.id) or "en"
-    await show_home(callback.message, language, edit=True)
-    await callback.answer()
+@dp.message(Add.dt)
+async def add_dt(m:Message,state:FSMContext):
+    u=await user(m.from_user.id); lang=u["language"]; tz=tz_of(u)
+    try: dt=parse_dt(m.text,tz)
+    except: await m.answer(texts(lang)["dt"],parse_mode="HTML"); return
+    if dt<=datetime.now(tz): await m.answer(texts(lang)["past"]); return
+    await state.update_data(dt=dt.isoformat()); await m.answer(texts(lang)["repeat"],reply_markup=repeat_kb(lang))
 
 
-@dp.callback_query(F.data.startswith("repeat:"))
-async def choose_repeat(callback: CallbackQuery, state: FSMContext):
-    language = await get_language(callback.from_user.id) or "en"
-    repeat = callback.data.split(":", 1)[1]
-
-    if repeat not in TEXT[language]["repeat_label"]:
-        await callback.answer()
-        return
-
-    data = await state.get_data()
-    title = data.get("title")
-    reminder_at = data.get("reminder_at")
-
-    if not title or not reminder_at:
-        await state.clear()
-        await show_home(callback.message, language, edit=True)
-        await callback.answer()
-        return
-
-    dt = datetime.fromisoformat(reminder_at)
-
-    async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute(
-            """
-            INSERT INTO reminders (
-                telegram_id,
-                title,
-                reminder_at,
-                repeat
-            )
-            VALUES (?, ?, ?, ?)
-            """,
-            (
-                callback.from_user.id,
-                title,
-                dt.isoformat(),
-                repeat,
-            ),
-        )
-        await db.commit()
-
-    await state.clear()
-
-    safe_title = html.escape(title)
-    repeat_text = TEXT[language]["repeat_label"][repeat]
-
-    await callback.message.edit_text(
-        f"<b>{TEXT[language]['added']}</b>\n\n"
-        f"📝 {safe_title}\n"
-        f"📅 {dt:%d.%m.%Y}\n"
-        f"⏰ {dt:%H:%M}\n"
-        f"🔁 {repeat_text}",
-        reply_markup=menu_keyboard(language),
-        parse_mode="HTML",
-    )
-    await callback.answer()
+@dp.callback_query(F.data.startswith("rep:"))
+async def add_rep(c:CallbackQuery,state:FSMContext):
+    lang=(await user(c.from_user.id))["language"]; rep=c.data.split(":")[1]; data=await state.get_data()
+    if rep not in texts(lang)["repeat_names"]: await c.answer(); return
+    async with aiosqlite.connect(DB) as db:
+        await db.execute("INSERT INTO reminders(telegram_id,title,reminder_at,repeat,category) VALUES(?,?,?,?,?)",(c.from_user.id,data["title"],data["dt"],rep,data.get("category","other"))); await db.commit()
+    await state.clear(); await c.message.edit_text(f"<b>{texts(lang)['added']}</b>\n\n📝 {html.escape(data['title'])}\n🔁 {texts(lang)['repeat_names'][rep]}",reply_markup=main_kb(lang),parse_mode="HTML"); await c.answer()
 
 
-@dp.callback_query(F.data == "menu:list")
-async def menu_list(callback: CallbackQuery):
-    language = await get_language(callback.from_user.id) or "en"
+@dp.callback_query(F.data=="cancel")
+async def cancel_cb(c:CallbackQuery,state:FSMContext):
+    await state.clear(); lang=(await user(c.from_user.id))["language"]; await home(c.message,lang,True); await c.answer()
 
-    async with aiosqlite.connect(DB_NAME) as db:
-        cursor = await db.execute(
-            """
-            SELECT id, title, reminder_at, repeat
-            FROM reminders
-            WHERE telegram_id = ? AND sent_at IS NULL
-            ORDER BY reminder_at
-            """,
-            (callback.from_user.id,),
-        )
-        rows = await cursor.fetchall()
 
-    if not rows:
-        text = TEXT[language]["no_reminders"]
-        keyboard = back_keyboard(language)
-    else:
-        lines = [TEXT[language]["reminders"], ""]
-        buttons = []
-
-        for reminder_id, title, reminder_at, repeat in rows:
-            dt = datetime.fromisoformat(reminder_at).astimezone(TIMEZONE)
-            repeat_text = TEXT[language]["repeat_label"].get(
-                repeat,
-                repeat,
-            )
-            lines.append(
-                f"#{reminder_id} · {dt:%d.%m.%Y %H:%M} · "
-                f"{html.escape(title)}\n"
-                f"🔁 {repeat_text}"
-            )
-            buttons.append(
-                [
-                    InlineKeyboardButton(
-                        text=f"{TEXT[language]['delete']} #{reminder_id}",
-                        callback_data=f"delete:{reminder_id}",
-                    )
-                ]
-            )
-
-        lines.append("")
-        lines.append(TEXT[language]["delete_hint"])
-
-        buttons.append(
-            [InlineKeyboardButton(
-                text=TEXT[language]["back"],
-                callback_data="menu:home",
-            )]
-        )
-
-        text = "\n".join(lines)
-        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=keyboard,
-        parse_mode="HTML",
-    )
-    await callback.answer()
+@dp.callback_query(F.data=="menu:list")
+async def list_cb(c:CallbackQuery):
+    u=await user(c.from_user.id); lang=u["language"]; tz=tz_of(u)
+    async with aiosqlite.connect(DB) as db:
+        q="SELECT DISTINCT r.id,r.title,r.reminder_at,r.repeat,r.category,r.telegram_id FROM reminders r LEFT JOIN shared_members s ON s.reminder_id=r.id WHERE r.telegram_id=? OR s.telegram_id=? ORDER BY r.reminder_at"
+        rows=await (await db.execute(q,(c.from_user.id,c.from_user.id))).fetchall()
+    if not rows: await c.message.edit_text(texts(lang)["empty"],reply_markup=back_kb(lang)); await c.answer(); return
+    await c.message.edit_text(texts(lang)["list"],reply_markup=back_kb(lang))
+    for rid,title,dt,rep,cat,owner in rows:
+        e=CAT.get(cat,CAT["other"])[0]; msg=f"{e} <b>{html.escape(title)}</b>\n📅 {datetime.fromisoformat(dt).astimezone(tz):%d.%m.%Y %H:%M}\n🔁 {texts(lang)['repeat_names'].get(rep,rep)}"
+        await c.message.answer(msg,reply_markup=list_actions(lang,rid),parse_mode="HTML")
+    await c.answer()
 
 
 @dp.callback_query(F.data.startswith("delete:"))
-async def delete_callback(callback: CallbackQuery):
-    language = await get_language(callback.from_user.id) or "en"
-    reminder_id = int(callback.data.split(":", 1)[1])
-
-    async with aiosqlite.connect(DB_NAME) as db:
-        cursor = await db.execute(
-            """
-            DELETE FROM reminders
-            WHERE id = ? AND telegram_id = ?
-            """,
-            (reminder_id, callback.from_user.id),
-        )
-        await db.commit()
-
-    if cursor.rowcount == 0:
-        await callback.answer(TEXT[language]["not_found"], show_alert=True)
-        return
-
-    await callback.answer(TEXT[language]["deleted"])
-    await menu_list(callback)
+async def del_cb(c:CallbackQuery):
+    rid=int(c.data.split(":")[1]); lang=(await user(c.from_user.id))["language"]
+    async with aiosqlite.connect(DB) as db:
+        cur=await db.execute("DELETE FROM reminders WHERE id=? AND telegram_id=?",(rid,c.from_user.id)); await db.commit()
+    await c.answer(texts(lang)["deleted"] if cur.rowcount else texts(lang)["notfound"],show_alert=cur.rowcount==0)
 
 
-@dp.callback_query(F.data == "menu:today")
-async def menu_today(callback: CallbackQuery):
-    language = await get_language(callback.from_user.id) or "en"
-    today_value = datetime.now(TIMEZONE).date().isoformat()
-
-    async with aiosqlite.connect(DB_NAME) as db:
-        cursor = await db.execute(
-            """
-            SELECT id, title, reminder_at, repeat
-            FROM reminders
-            WHERE telegram_id = ?
-              AND sent_at IS NULL
-              AND reminder_at LIKE ?
-            ORDER BY reminder_at
-            """,
-            (callback.from_user.id, f"{today_value}%"),
-        )
-        rows = await cursor.fetchall()
-
-    if not rows:
-        text = TEXT[language]["nothing_today"]
-    else:
-        lines = [TEXT[language]["today"], ""]
-        for reminder_id, title, reminder_at, repeat in rows:
-            dt = datetime.fromisoformat(reminder_at).astimezone(TIMEZONE)
-            lines.append(
-                f"#{reminder_id} · {dt:%H:%M} · {html.escape(title)}"
-            )
-        text = "\n".join(lines)
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=back_keyboard(language),
-        parse_mode="HTML",
-    )
-    await callback.answer()
+@dp.callback_query(F.data.startswith("edit:"))
+async def edit_cb(c:CallbackQuery,state:FSMContext):
+    rid=int(c.data.split(":")[1]); lang=(await user(c.from_user.id))["language"]
+    async with aiosqlite.connect(DB) as db:
+        row=await (await db.execute("SELECT title FROM reminders WHERE id=? AND telegram_id=?",(rid,c.from_user.id))).fetchone()
+    if not row: await c.answer(texts(lang)["notfound"],show_alert=True); return
+    await state.update_data(rid=rid); await state.set_state(Edit.title); await c.message.answer(f"{texts(lang)['edit']}\n\n{html.escape(row[0])}\n\n📝 Новое название:",parse_mode="HTML"); await c.answer()
 
 
-@dp.callback_query(F.data == "menu:language")
-async def menu_language(callback: CallbackQuery):
-    language = await get_language(callback.from_user.id) or "en"
-    await callback.message.edit_text(
-        TEXT[language]["choose_language"],
-        reply_markup=language_keyboard(),
-    )
-    await callback.answer()
+@dp.message(Edit.title)
+async def edit_title(m:Message,state:FSMContext):
+    lang=(await user(m.from_user.id))["language"]; await state.update_data(new_title=m.text.strip()); await state.set_state(Edit.dt); await m.answer(texts(lang)["dt"],parse_mode="HTML")
 
 
-@dp.callback_query(F.data == "menu:help")
-async def menu_help(callback: CallbackQuery):
-    language = await get_language(callback.from_user.id) or "en"
-    await callback.message.edit_text(
-        TEXT[language]["help_text"],
-        reply_markup=back_keyboard(language),
-        parse_mode="HTML",
-    )
-    await callback.answer()
+@dp.message(Edit.dt)
+async def edit_dt(m:Message,state:FSMContext):
+    u=await user(m.from_user.id); lang=u["language"]; tz=tz_of(u)
+    try: dt=parse_dt(m.text,tz)
+    except: await m.answer(texts(lang)["dt"],parse_mode="HTML"); return
+    if dt<=datetime.now(tz): await m.answer(texts(lang)["past"]); return
+    d=await state.get_data()
+    async with aiosqlite.connect(DB) as db:
+        await db.execute("UPDATE reminders SET title=?,reminder_at=?,sent_at=NULL WHERE id=? AND telegram_id=?",(d["new_title"],dt.isoformat(),d["rid"],m.from_user.id)); await db.commit()
+    await state.clear(); await m.answer(texts(lang)["added"],reply_markup=main_kb(lang))
 
 
-@dp.message(Command("help"))
-async def help_command(message: Message):
-    language = await get_language(message.from_user.id) or "en"
-    await message.answer(
-        TEXT[language]["help_text"],
-        parse_mode="HTML",
-    )
+@dp.callback_query(F.data.startswith("share:"))
+async def share_cb(c:CallbackQuery):
+    rid=int(c.data.split(":")[1]); lang=(await user(c.from_user.id))["language"]
+    async with aiosqlite.connect(DB) as db:
+        row=await (await db.execute("SELECT share_token FROM reminders WHERE id=? AND telegram_id=?",(rid,c.from_user.id))).fetchone()
+        if not row: await c.answer(texts(lang)["notfound"],show_alert=True); return
+        token=row[0] or os.urandom(8).hex(); await db.execute("UPDATE reminders SET share_token=? WHERE id=?",(token,rid)); await db.commit()
+    me=await c.bot.get_me(); await c.message.answer(f"🔗 <code>https://t.me/{me.username}?start=share_{token}</code>",parse_mode="HTML"); await c.answer()
 
 
-@dp.message(Command("list"))
-async def list_command(message: Message):
-    language = await get_language(message.from_user.id) or "en"
-
-    async with aiosqlite.connect(DB_NAME) as db:
-        cursor = await db.execute(
-            """
-            SELECT id, title, reminder_at, repeat
-            FROM reminders
-            WHERE telegram_id = ? AND sent_at IS NULL
-            ORDER BY reminder_at
-            """,
-            (message.from_user.id,),
-        )
-        rows = await cursor.fetchall()
-
-    if not rows:
-        await message.answer(TEXT[language]["no_reminders"])
-        return
-
-    lines = [TEXT[language]["reminders"], ""]
-
-    for reminder_id, title, reminder_at, repeat in rows:
-        dt = datetime.fromisoformat(reminder_at).astimezone(TIMEZONE)
-        repeat_text = TEXT[language]["repeat_label"].get(repeat, repeat)
-        lines.append(
-            f"#{reminder_id} · {dt:%d.%m.%Y %H:%M} · {html.escape(title)}\n"
-            f"🔁 {repeat_text}"
-        )
-
-    await message.answer("\n".join(lines), parse_mode="HTML")
+@dp.callback_query(F.data=="menu:today")
+async def today_cb(c:CallbackQuery):
+    u=await user(c.from_user.id); lang=u["language"]; tz=tz_of(u); today=datetime.now(tz).date().isoformat()
+    async with aiosqlite.connect(DB) as db:
+        q="SELECT DISTINCT r.title,r.reminder_at,r.category FROM reminders r LEFT JOIN shared_members s ON s.reminder_id=r.id WHERE (r.telegram_id=? OR s.telegram_id=?) AND r.sent_at IS NULL AND r.reminder_at LIKE ? ORDER BY r.reminder_at"
+        rows=await (await db.execute(q,(c.from_user.id,c.from_user.id,today+"%"))).fetchall()
+    if not rows: text=texts(lang)["nothing"]
+    else: text="\n\n".join(f"{CAT.get(cat,CAT['other'])[0]} {html.escape(title)} · {datetime.fromisoformat(dt).astimezone(tz):%H:%M}" for title,dt,cat in rows)
+    await c.message.edit_text(text,reply_markup=back_kb(lang),parse_mode="HTML"); await c.answer()
 
 
-@dp.message(Command("today"))
-async def today_command(message: Message):
-    language = await get_language(message.from_user.id) or "en"
-    today_value = datetime.now(TIMEZONE).date().isoformat()
-
-    async with aiosqlite.connect(DB_NAME) as db:
-        cursor = await db.execute(
-            """
-            SELECT id, title, reminder_at
-            FROM reminders
-            WHERE telegram_id = ?
-              AND sent_at IS NULL
-              AND reminder_at LIKE ?
-            ORDER BY reminder_at
-            """,
-            (message.from_user.id, f"{today_value}%"),
-        )
-        rows = await cursor.fetchall()
-
-    if not rows:
-        await message.answer(TEXT[language]["nothing_today"])
-        return
-
-    lines = [TEXT[language]["today"], ""]
-
-    for reminder_id, title, reminder_at in rows:
-        dt = datetime.fromisoformat(reminder_at).astimezone(TIMEZONE)
-        lines.append(f"#{reminder_id} · {dt:%H:%M} · {html.escape(title)}")
-
-    await message.answer("\n".join(lines), parse_mode="HTML")
+@dp.callback_query(F.data=="menu:lang")
+async def lang_menu(c:CallbackQuery):
+    await c.message.edit_text(texts((await user(c.from_user.id))["language"])["lang"],reply_markup=lang_kb()); await c.answer()
 
 
-@dp.message(Command("delete"))
-async def delete_command(message: Message):
-    language = await get_language(message.from_user.id) or "en"
-    payload = message.text.removeprefix("/delete").strip()
-
-    try:
-        reminder_id = int(payload)
-    except ValueError:
-        await message.answer("/delete ID")
-        return
-
-    async with aiosqlite.connect(DB_NAME) as db:
-        cursor = await db.execute(
-            """
-            DELETE FROM reminders
-            WHERE id = ? AND telegram_id = ?
-            """,
-            (reminder_id, message.from_user.id),
-        )
-        await db.commit()
-
-    if cursor.rowcount == 0:
-        await message.answer(TEXT[language]["not_found"])
-        return
-
-    await message.answer(TEXT[language]["deleted"])
+@dp.callback_query(F.data=="menu:help")
+async def help_cb(c:CallbackQuery):
+    lang=(await user(c.from_user.id))["language"]; await c.message.edit_text(texts(lang)["help_text"],reply_markup=back_kb(lang)); await c.answer()
 
 
-async def deliver_reminders(bot: Bot):
+@dp.callback_query(F.data=="menu:settings")
+async def settings_cb(c:CallbackQuery):
+    u=await user(c.from_user.id); lang=u["language"]; await c.message.edit_text(f"<b>{texts(lang)['settings']}</b>\n\n{texts(lang)['tz']}: {u['timezone']}\n{texts(lang)['digest']}: {'✅' if u['digest_enabled'] else '❌'}",reply_markup=settings_kb(lang,bool(u["digest_enabled"])),parse_mode="HTML"); await c.answer()
+
+
+@dp.callback_query(F.data=="settings:tz")
+async def settings_tz(c:CallbackQuery):
+    lang=(await user(c.from_user.id))["language"]; await c.message.edit_text(texts(lang)["choose_tz"],reply_markup=tz_kb(lang)); await c.answer()
+
+
+@dp.callback_query(F.data.startswith("tz:"))
+async def tz_cb(c:CallbackQuery):
+    key=c.data.split(":")[1]; lang=(await user(c.from_user.id))["language"]; tz=TZS[key][1]
+    async with aiosqlite.connect(DB) as db:
+        await db.execute("UPDATE users SET timezone=? WHERE telegram_id=?",(tz,c.from_user.id)); await db.commit()
+    await c.answer(texts(lang)["tz_saved"]); await settings_cb(c)
+
+
+@dp.callback_query(F.data=="settings:digest")
+async def digest_cb(c:CallbackQuery):
+    lang=(await user(c.from_user.id))["language"]
+    async with aiosqlite.connect(DB) as db:
+        cur=await (await db.execute("SELECT digest_enabled FROM users WHERE telegram_id=?",(c.from_user.id,))).fetchone()
+        new=0 if cur and cur[0] else 1
+        await db.execute("UPDATE users SET digest_enabled=? WHERE telegram_id=?",(new,c.from_user.id)); await db.commit()
+    await c.answer(texts(lang)["digest_on"] if new else texts(lang)["digest_off"]); await settings_cb(c)
+
+
+@dp.callback_query(F.data=="menu:export")
+async def export_cb(c:CallbackQuery):
+    path=await export_ics(c.from_user.id); await c.message.answer_document(FSInputFile(path,filename="reminders.ics")); await c.answer()
+
+
+@dp.callback_query(F.data=="menu:smart")
+async def smart_cb(c:CallbackQuery,state:FSMContext):
+    lang=(await user(c.from_user.id))["language"]; await state.set_state(Smart.text); await c.message.edit_text(texts(lang)["smart_prompt"],reply_markup=back_kb(lang),parse_mode="HTML"); await c.answer()
+
+
+@dp.message(Smart.text)
+async def smart_msg(m:Message,state:FSMContext):
+    u=await user(m.from_user.id); tz=tz_of(u)
+    try: parsed,used_ai=await ai_parse(m.text,tz,u["language"])
+    except: parsed,used_ai=parse_smart(m.text,tz),False
+    if not parsed: await m.answer(texts(u["language"])["smart_prompt"],parse_mode="HTML"); return
+    if len(parsed)==2: dt,title=parsed; rep="once"; cat="other"
+    else: dt,title,rep,cat=parsed
+    if dt<=datetime.now(tz): await m.answer(texts(u["language"])["past"]); return
+    async with aiosqlite.connect(DB) as db:
+        await db.execute("INSERT INTO reminders(telegram_id,title,reminder_at,repeat,category) VALUES(?,?,?,?,?)",(m.from_user.id,title,dt.isoformat(),rep,cat)); await db.commit()
+    await state.clear(); await m.answer(f"<b>{texts(u['language'])['added']}</b>\n\n📝 {html.escape(title)}\n📅 {dt:%d.%m.%Y %H:%M}\n🔁 {texts(u['language'])['repeat_names'].get(rep,rep)}",reply_markup=main_kb(u["language"]),parse_mode="HTML")
+
+
+@dp.callback_query(F.data.startswith("snooze:"))
+async def snooze(c:CallbackQuery):
+    _,mins,rid=c.data.split(":"); mins=int(mins); rid=int(rid); u=await user(c.from_user.id)
+    async with aiosqlite.connect(DB) as db:
+        row=await (await db.execute("SELECT title,category FROM reminders WHERE id=?",(rid,))).fetchone()
+        if not row: await c.answer(texts(u["language"])["notfound"],show_alert=True); return
+        dt=datetime.now(tz_of(u))+timedelta(minutes=mins)
+        await db.execute("INSERT INTO reminders(telegram_id,title,reminder_at,repeat,category) VALUES(?,?,?,?,?)",(c.from_user.id,row[0],dt.isoformat(),"once",row[1])); await db.commit()
+    await c.message.edit_reply_markup(reply_markup=None); await c.answer("✅")
+
+
+@dp.callback_query(F.data.startswith("done:"))
+async def done(c:CallbackQuery):
+    _,rid=c.data.split(":"); u=await user(c.from_user.id)
+    async with aiosqlite.connect(DB) as db:
+        await db.execute("UPDATE reminders SET sent_at=? WHERE id=? AND repeat='once'",(datetime.now(timezone.utc).isoformat(),int(rid))); await db.commit()
+    await c.message.edit_reply_markup(reply_markup=None); await c.answer(texts(u["language"])["done"])
+
+
+async def share_join(token,uid):
+    async with aiosqlite.connect(DB) as db:
+        row=await (await db.execute("SELECT id FROM reminders WHERE share_token=?",(token,))).fetchone()
+        if not row: return False
+        await db.execute("INSERT OR IGNORE INTO shared_members(reminder_id,telegram_id,joined_at) VALUES(?,?,?)",(row[0],uid,datetime.now(timezone.utc).isoformat())); await db.commit()
+    return True
+
+
+async def digest(bot):
+    async with aiosqlite.connect(DB) as db:
+        users=await (await db.execute("SELECT telegram_id,language,timezone,digest_enabled,last_digest_date FROM users WHERE digest_enabled=1")).fetchall()
+    for uid,lang,tzname,on,last in users:
+        try: tz=ZoneInfo(tzname)
+        except: tz=ZoneInfo(DEFAULT_TZ)
+        n=datetime.now(tz)
+        if n.hour!=9 or n.minute!=0 or last==n.date().isoformat(): continue
+        today=n.date().isoformat()
+        async with aiosqlite.connect(DB) as db:
+            q="SELECT DISTINCT r.title,r.reminder_at,r.category FROM reminders r LEFT JOIN shared_members s ON s.reminder_id=r.id WHERE (r.telegram_id=? OR s.telegram_id=?) AND r.sent_at IS NULL AND r.reminder_at LIKE ? ORDER BY r.reminder_at"
+            rows=await (await db.execute(q,(uid,uid,today+"%"))).fetchall()
+            await db.execute("UPDATE users SET last_digest_date=? WHERE telegram_id=?",(today,uid)); await db.commit()
+        text=texts(lang)["digest_title"]+"\n\n"+(texts(lang)["empty"] if not rows else "\n".join(f"{CAT.get(cat,CAT['other'])[0]} {datetime.fromisoformat(dt).astimezone(tz):%H:%M} · {html.escape(title)}" for title,dt,cat in rows))
+        await bot.send_message(uid,text,parse_mode="HTML",reply_markup=main_kb(lang))
+
+
+async def worker(bot):
     while True:
-        now = datetime.now(TIMEZONE).replace(second=0, microsecond=0)
-
-        async with aiosqlite.connect(DB_NAME) as db:
-            cursor = await db.execute(
-                """
-                SELECT id, telegram_id, title, reminder_at, repeat
-                FROM reminders
-                WHERE sent_at IS NULL
-                  AND reminder_at <= ?
-                ORDER BY reminder_at
-                """,
-                (now.isoformat(),),
-            )
-            rows = await cursor.fetchall()
-
-            for reminder_id, telegram_id, title, reminder_at, repeat in rows:
-                language = await get_language(telegram_id) or "en"
-                safe_title = html.escape(title)
-
-                await bot.send_message(
-                    telegram_id,
-                    f"<b>{TEXT[language]['reminder']}</b>\n\n📝 {safe_title}",
-                    parse_mode="HTML",
-                    reply_markup=menu_keyboard(language),
-                )
-
-                next_date = next_occurrence(
-                    datetime.fromisoformat(reminder_at),
-                    repeat,
-                )
-
-                if next_date is None:
-                    await db.execute(
-                        """
-                        UPDATE reminders
-                        SET sent_at = ?
-                        WHERE id = ?
-                        """,
-                        (
-                            datetime.now(timezone.utc).isoformat(),
-                            reminder_id,
-                        ),
-                    )
-                else:
-                    await db.execute(
-                        """
-                        UPDATE reminders
-                        SET reminder_at = ?
-                        WHERE id = ?
-                        """,
-                        (next_date.isoformat(), reminder_id),
-                    )
-
+        await digest(bot)
+        now=datetime.now(timezone.utc).isoformat()
+        async with aiosqlite.connect(DB) as db:
+            rows=await (await db.execute("SELECT id,telegram_id,title,reminder_at,repeat,category FROM reminders WHERE sent_at IS NULL AND reminder_at<=? ORDER BY reminder_at",(now,))).fetchall()
+            for rid,owner,title,dt,rep,cat in rows:
+                for uid in await recipients(rid,owner):
+                    u=await user(uid)
+                    local=datetime.fromisoformat(dt).astimezone(tz_of(u))
+                    await bot.send_message(uid,f"<b>🔔 Reminder</b>\n\n{CAT.get(cat,CAT['other'])[0]} {html.escape(title)}\n⏰ {local:%d.%m.%Y %H:%M}",parse_mode="HTML",reply_markup=action_kb(u["language"],rid))
+                nxt=next_dt(datetime.fromisoformat(dt),rep)
+                if nxt is None: await db.execute("UPDATE reminders SET sent_at=? WHERE id=?",(datetime.now(timezone.utc).isoformat(),rid))
+                else: await db.execute("UPDATE reminders SET reminder_at=? WHERE id=?",(nxt.isoformat(),rid))
             await db.commit()
-
-        await asyncio.sleep(CHECK_EVERY_SECONDS)
+        await asyncio.sleep(CHECK)
 
 
 async def main():
-    token = os.getenv("BOT_TOKEN")
-
-    if not token:
-        raise RuntimeError("BOT_TOKEN is not set")
-
-    await init_db()
-
+    token=os.getenv("BOT_TOKEN")
+    if not token: raise RuntimeError("BOT_TOKEN is not set")
+    await db_init()
     async with Bot(token=token) as bot:
         await bot.delete_webhook(drop_pending_updates=False)
-        me = await bot.get_me()
-        print(f"Bot started: @{me.username}", flush=True)
-
-        await asyncio.gather(
-            dp.start_polling(bot),
-            deliver_reminders(bot),
-        )
+        me=await bot.get_me(); print(f"Bot started: @{me.username}",flush=True)
+        await asyncio.gather(dp.start_polling(bot),worker(bot))
 
 
-if __name__ == "__main__":
+if __name__=="__main__":
     asyncio.run(main())
