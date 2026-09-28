@@ -530,10 +530,12 @@ async def digest(bot):
 async def worker(bot):
     while True:
         await digest(bot)
-        now=datetime.now(timezone.utc).isoformat()
+        now=datetime.now(timezone.utc)
         async with aiosqlite.connect(DB) as db:
-            rows=await (await db.execute("SELECT id,telegram_id,title,reminder_at,repeat,category FROM reminders WHERE sent_at IS NULL AND reminder_at<=? ORDER BY reminder_at",(now,))).fetchall()
+            rows=await (await db.execute("SELECT id,telegram_id,title,reminder_at,repeat,category FROM reminders WHERE sent_at IS NULL ORDER BY reminder_at")).fetchall()
             for rid,owner,title,dt,rep,cat in rows:
+                if datetime.fromisoformat(dt).astimezone(timezone.utc) > now:
+                    continue
                 for uid in await recipients(rid,owner):
                     u=await user(uid)
                     local=datetime.fromisoformat(dt).astimezone(tz_of(u))
