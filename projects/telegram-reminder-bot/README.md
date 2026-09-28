@@ -1,27 +1,32 @@
 # Telegram Reminder Bot
 
-A Telegram bot for reminders.
+A Telegram reminder bot I'm using to learn backend development, async Python and APIs.
 
-I built it to practice async Python, SQLite and Telegram APIs.
+### Current features
 
-### What it can do
-
-- repeating reminders
+- calendar-style date picker
+- quick time buttons
+- reminders in advance
 - snooze notifications
-- edit and delete reminders
-- categories
-- time zones
-- morning digest
-- natural language input
-- optional OpenAI parsing
-- .ics calendar export
+- search
+- completed history and archive
+- priorities and categories
+- profile and statistics
+- time zones and morning digest
+- repeating reminders and custom weekdays
 - shared reminders
-- Russian, English, Italian and Ukrainian
+- smart input with optional OpenAI support
+- calendar export
+- Russian, English, Italian and Ukrainian UI
 
-### Built with
+### Backend direction
 
-Python · aiogram · SQLite · OpenAI API (optional)
+The current Telegram demo still uses SQLite because it is easy to test in GitHub Actions.
 
-### Note
+The v2 folder adds the PostgreSQL + Redis + FastAPI architecture. PostgreSQL stores reminders, Redis is used for background jobs, and FastAPI exposes the admin API.
 
-The demo currently runs on GitHub Actions, so SQLite data is not persistent between workflow runs. For real long-term use, the next step is PostgreSQL or another persistent database.
+Docker Compose is included for local development.
+
+### Stack
+
+Python · aiogram · SQLite · PostgreSQL · Redis · FastAPI · Docker · GitHub Actions
