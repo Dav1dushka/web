@@ -65,10 +65,10 @@ CAT = {
 TZS = {"prague": ("🇨🇿 Europe/Prague", "Europe/Prague"), "rome": ("🇮🇹 Europe/Rome", "Europe/Rome"), "kyiv": ("🇺🇦 Europe/Kyiv", "Europe/Kyiv"), "utc": ("🌍 UTC", "UTC")}
 
 UI = {
-"ru":{"welcome":"⏰ <b>Reminder Bot</b>\nЯ помогу не забыть важные даты и дела.","menu":"Главное меню","add":"➕ Добавить","list":"📅 Мои","today":"📌 Сегодня","lang":"🌐 Язык","help":"ℹ️ Помощь","settings":"⚙️ Настройки","smart":"✨ Умный ввод","export":"📤 Экспорт","title":"📝 Что напомнить?","cat":"🏷 Категория","dt":"📅 Дата и время: <code>27.10.2026 09:00</code>","repeat":"🔁 Повтор","once":"Один раз","daily":"Каждый день","2d":"Через 2 дня","week":"Через неделю","month":"Через месяц","year":"Через год","cancel":"✖️ Отмена","added":"✅ Добавлено","empty":"📭 Пока пусто.","deleted":"🗑 Удалено.","notfound":"Не найдено.","past":"Это время уже прошло.","back":"↩️ Назад","edit":"✏️ Изменить","share":"🔗 Поделиться","snooze10":"⏰ 10 мин","snooze60":"⏰ 1 час","snooze1440":"📅 Завтра","done":"✅ Готово","settings_title":"⚙️ Настройки","tz":"🌍 Часовой пояс","digest":"🌅 Утренний обзор","digest_on":"✅ Обзор включён на 09:00.","digest_off":"Обзор выключен.","choose_tz":"Выбери часовой пояс","tz_saved":"✅ Сохранено.","smart_prompt":"✨ Напиши обычной фразой, например: <code>через 3 дня в 19:00 купить подарок маме</code>","help_text":"➕ Добавляй напоминания шаг за шагом.\n✨ Умный ввод понимает обычные фразы.\n🔔 После уведомления можно отложить его.\n📤 Экспорт создаёт .ics для календаря.\n🔗 Поделиться даёт ссылку для общего напоминания.","digest_title":"🌅 Сегодня","nothing":"На сегодня ничего нет.","repeat_names":{"once":"разово","daily":"ежедневно","2d":"раз в 2 дня","week":"еженедельно","month":"ежемесячно","year":"ежегодно"},"lang_saved":"✅ Язык сохранён."},
-"en":{"welcome":"⏰ <b>Reminder Bot</b>\nI'll help you remember important dates and tasks.","menu":"Main menu","add":"➕ Add","list":"📅 My reminders","today":"📌 Today","lang":"🌐 Language","help":"ℹ️ Help","settings":"⚙️ Settings","smart":"✨ Smart input","export":"📤 Export","title":"📝 What should I remind you about?","cat":"🏷 Category","dt":"📅 Date and time: <code>27.10.2026 09:00</code>","repeat":"🔁 Repeat","once":"Once","daily":"Every day","2d":"Every 2 days","week":"Every week","month":"Every month","year":"Every year","cancel":"✖️ Cancel","added":"✅ Added","empty":"📭 Nothing here yet.","deleted":"🗑 Deleted.","notfound":"Not found.","past":"That time is already in the past.","back":"↩️ Back","edit":"✏️ Edit","share":"🔗 Share","snooze10":"⏰ 10 min","snooze60":"⏰ 1 hour","snooze1440":"📅 Tomorrow","done":"✅ Done","settings_title":"⚙️ Settings","tz":"🌍 Time zone","digest":"🌅 Morning digest","digest_on":"✅ Digest enabled for 09:00.","digest_off":"Digest disabled.","choose_tz":"Choose your time zone","tz_saved":"✅ Saved.","smart_prompt":"✨ Write naturally, for example: <code>in 3 days at 19:00 buy a gift for mom</code>","help_text":"➕ Add reminders step by step.\n✨ Smart input understands normal phrases.\n🔔 Snooze notifications.\n📤 Export .ics.\n🔗 Share reminders with someone else.","digest_title":"🌅 Today","nothing":"Nothing planned for today.","repeat_names":{"once":"once","daily":"daily","2d":"every 2 days","week":"weekly","month":"monthly","year":"yearly"},"lang_saved":"✅ Language saved."},
+"ru":{"welcome":"⏰ <b>Reminder Bot</b>\nЯ помогу не забыть важные даты и дела.","menu":"Главное меню","add":"➕ Добавить","list":"📅 Мои","today":"📌 Сегодня","lang":"🌐 Язык","help":"ℹ️ Помощь","settings":"⚙️ Настройки","smart":"✨ Умный ввод","export":"📤 Экспорт","title":"📝 Что напомнить?","cat":"🏷 Категория","dt":"📅 Дата и время: <code>27.10.2026 09:00</code>","repeat":"🔁 Повтор","once":"Один раз","daily":"Каждый день","2d":"Через 2 дня","week":"Через неделю","month":"Через месяц","year":"Через год","cancel":"✖️ Отмена","added":"✅ Добавлено","empty":"📭 Пока пусто.","deleted":"🗑 Удалено.","notfound":"Не найдено.","past":"Это время уже прошло.","choose_minutes":"⏱ Выбери минуты","custom_time":"✏️ Ввести своё время","custom_time_prompt":"⌨️ Напиши время в формате HH:MM, например 18:35.","custom_time_invalid":"Нужно написать время в формате HH:MM, например 08:05.","back":"↩️ Назад","edit":"✏️ Изменить","share":"🔗 Поделиться","snooze10":"⏰ 10 мин","snooze60":"⏰ 1 час","snooze1440":"📅 Завтра","done":"✅ Готово","settings_title":"⚙️ Настройки","tz":"🌍 Часовой пояс","digest":"🌅 Утренний обзор","digest_on":"✅ Обзор включён на 09:00.","digest_off":"Обзор выключен.","choose_tz":"Выбери часовой пояс","tz_saved":"✅ Сохранено.","smart_prompt":"✨ Напиши обычной фразой, например: <code>через 3 дня в 19:00 купить подарок маме</code>","help_text":"➕ Добавляй напоминания шаг за шагом.\n✨ Умный ввод понимает обычные фразы.\n🔔 После уведомления можно отложить его.\n📤 Экспорт создаёт .ics для календаря.\n🔗 Поделиться даёт ссылку для общего напоминания.","digest_title":"🌅 Сегодня","nothing":"На сегодня ничего нет.","repeat_names":{"once":"разово","daily":"ежедневно","2d":"раз в 2 дня","week":"еженедельно","month":"ежемесячно","year":"ежегодно"},"lang_saved":"✅ Язык сохранён."},
+"en":{"welcome":"⏰ <b>Reminder Bot</b>\nI'll help you remember important dates and tasks.","menu":"Main menu","add":"➕ Add","list":"📅 My reminders","today":"📌 Today","lang":"🌐 Language","help":"ℹ️ Help","settings":"⚙️ Settings","smart":"✨ Smart input","export":"📤 Export","title":"📝 What should I remind you about?","cat":"🏷 Category","dt":"📅 Date and time: <code>27.10.2026 09:00</code>","repeat":"🔁 Repeat","once":"Once","daily":"Every day","2d":"Every 2 days","week":"Every week","month":"Every month","year":"Every year","cancel":"✖️ Cancel","added":"✅ Added","empty":"📭 Nothing here yet.","deleted":"🗑 Deleted.","notfound":"Not found.","past":"That time is already in the past.","choose_minutes":"⏱ Choose minutes","custom_time":"✏️ Enter custom time","custom_time_prompt":"⌨️ Type the time as HH:MM, for example 18:35.","custom_time_invalid":"Use HH:MM format, for example 08:05.","back":"↩️ Back","edit":"✏️ Edit","share":"🔗 Share","snooze10":"⏰ 10 min","snooze60":"⏰ 1 hour","snooze1440":"📅 Tomorrow","done":"✅ Done","settings_title":"⚙️ Settings","tz":"🌍 Time zone","digest":"🌅 Morning digest","digest_on":"✅ Digest enabled for 09:00.","digest_off":"Digest disabled.","choose_tz":"Choose your time zone","tz_saved":"✅ Saved.","smart_prompt":"✨ Write naturally, for example: <code>in 3 days at 19:00 buy a gift for mom</code>","help_text":"➕ Add reminders step by step.\n✨ Smart input understands normal phrases.\n🔔 Snooze notifications.\n📤 Export .ics.\n🔗 Share reminders with someone else.","digest_title":"🌅 Today","nothing":"Nothing planned for today.","repeat_names":{"once":"once","daily":"daily","2d":"every 2 days","week":"weekly","month":"monthly","year":"yearly"},"lang_saved":"✅ Language saved."},
 "it":{"welcome":"⏰ <b>Reminder Bot</b>\nTi aiuterò a ricordare date e attività importanti.","menu":"Menu principale","add":"➕ Aggiungi","list":"📅 I miei","today":"📌 Oggi","lang":"🌐 Lingua","help":"ℹ️ Aiuto","settings":"⚙️ Impostazioni","smart":"✨ Input smart","export":"📤 Esporta","title":"📝 Cosa devo ricordarti?","cat":"🏷 Categoria","dt":"📅 Data e ora: <code>27.10.2026 09:00</code>","repeat":"🔁 Ripetizione","once":"Una volta","daily":"Ogni giorno","2d":"Ogni 2 giorni","week":"Ogni settimana","month":"Ogni mese","year":"Ogni anno","cancel":"✖️ Annulla","added":"✅ Aggiunto","empty":"📭 Ancora niente.","deleted":"🗑 Eliminato.","notfound":"Non trovato.","past":"Questo orario è già passato.","back":"↩️ Indietro","edit":"✏️ Modifica","share":"🔗 Condividi","snooze10":"⏰ 10 min","snooze60":"⏰ 1 ora","snooze1440":"📅 Domani","done":"✅ Fatto","settings_title":"⚙️ Impostazioni","tz":"🌍 Fuso orario","digest":"🌅 Riepilogo","digest_on":"✅ Riepilogo attivo alle 09:00.","digest_off":"Riepilogo disattivato.","choose_tz":"Scegli il fuso orario","tz_saved":"✅ Salvato.","smart_prompt":"✨ Scrivi in modo naturale, per esempio: <code>tra 3 giorni alle 19:00 compra un regalo per mamma</code>","help_text":"➕ Aggiungi passo dopo passo.\n✨ Input smart per frasi normali.\n🔔 Posticipa le notifiche.\n📤 Esporta .ics.\n🔗 Condividi promemoria.","digest_title":"🌅 Oggi","nothing":"Niente per oggi.","repeat_names":{"once":"una volta","daily":"giornaliero","2d":"ogni 2 giorni","week":"settimanale","month":"mensile","year":"annuale"},"lang_saved":"✅ Lingua salvata."},
-"uk":{"welcome":"⏰ <b>Reminder Bot</b>\nЯ допоможу не забувати важливі дати та справи.","menu":"Головне меню","add":"➕ Додати","list":"📅 Мої","today":"📌 Сьогодні","lang":"🌐 Мова","help":"ℹ️ Допомога","settings":"⚙️ Налаштування","smart":"✨ Розумний ввід","export":"📤 Експорт","title":"📝 Що потрібно нагадати?","cat":"🏷 Категорія","dt":"📅 Дата і час: <code>27.10.2026 09:00</code>","repeat":"🔁 Повтор","once":"Один раз","daily":"Щодня","2d":"Через 2 дні","week":"Щотижня","month":"Щомісяця","year":"Щороку","cancel":"✖️ Скасувати","added":"✅ Додано","empty":"📭 Поки порожньо.","deleted":"🗑 Видалено.","notfound":"Не знайдено.","past":"Цей час уже минув.","back":"↩️ Назад","edit":"✏️ Змінити","share":"🔗 Поділитися","snooze10":"⏰ 10 хв","snooze60":"⏰ 1 год","snooze1440":"📅 Завтра","done":"✅ Готово","settings_title":"⚙️ Налаштування","tz":"🌍 Часовий пояс","digest":"🌅 Ранковий огляд","digest_on":"✅ Огляд увімкнено на 09:00.","digest_off":"Огляд вимкнено.","choose_tz":"Обери часовий пояс","tz_saved":"✅ Збережено.","smart_prompt":"✨ Напиши звичайною фразою, наприклад: <code>через 3 дні о 19:00 купити подарунок мамі</code>","help_text":"➕ Додавай крок за кроком.\n✨ Розумний ввід розуміє звичайні фрази.\n🔔 Відкладай нагадування.\n📤 Експорт .ics.\n🔗 Ділися нагадуваннями.","digest_title":"🌅 Сьогодні","nothing":"На сьогодні нічого немає.","repeat_names":{"once":"разово","daily":"щодня","2d":"раз на 2 дні","week":"щотижня","month":"щомісяця","year":"щорічно"},"lang_saved":"✅ Мову збережено."}
+"uk":{"welcome":"⏰ <b>Reminder Bot</b>\nЯ допоможу не забувати важливі дати та справи.","menu":"Головне меню","add":"➕ Додати","list":"📅 Мої","today":"📌 Сьогодні","lang":"🌐 Мова","help":"ℹ️ Допомога","settings":"⚙️ Налаштування","smart":"✨ Розумний ввід","export":"📤 Експорт","title":"📝 Що потрібно нагадати?","cat":"🏷 Категорія","dt":"📅 Дата і час: <code>27.10.2026 09:00</code>","repeat":"🔁 Повтор","once":"Один раз","daily":"Щодня","2d":"Через 2 дні","week":"Щотижня","month":"Щомісяця","year":"Щороку","cancel":"✖️ Скасувати","added":"✅ Додано","empty":"📭 Поки порожньо.","deleted":"🗑 Видалено.","notfound":"Не знайдено.","past":"Цей час уже минув.","choose_minutes":"⏱ Обери хвилини","custom_time":"✏️ Ввести свій час","custom_time_prompt":"⌨️ Введи час у форматі HH:MM, наприклад 18:35.","custom_time_invalid":"Використай формат HH:MM, наприклад 08:05.","back":"↩️ Назад","edit":"✏️ Змінити","share":"🔗 Поділитися","snooze10":"⏰ 10 хв","snooze60":"⏰ 1 год","snooze1440":"📅 Завтра","done":"✅ Готово","settings_title":"⚙️ Налаштування","tz":"🌍 Часовий пояс","digest":"🌅 Ранковий огляд","digest_on":"✅ Огляд увімкнено на 09:00.","digest_off":"Огляд вимкнено.","choose_tz":"Обери часовий пояс","tz_saved":"✅ Збережено.","smart_prompt":"✨ Напиши звичайною фразою, наприклад: <code>через 3 дні о 19:00 купити подарунок мамі</code>","help_text":"➕ Додавай крок за кроком.\n✨ Розумний ввід розуміє звичайні фрази.\n🔔 Відкладай нагадування.\n📤 Експорт .ics.\n🔗 Ділися нагадуваннями.","digest_title":"🌅 Сьогодні","nothing":"На сьогодні нічого немає.","repeat_names":{"once":"разово","daily":"щодня","2d":"раз на 2 дні","week":"щотижня","month":"щомісяця","year":"щорічно"},"lang_saved":"✅ Мову збережено."}
 }
 
 
@@ -168,10 +168,40 @@ def calendar_kb(lang,year,month):
     for week in calendar.monthcalendar(year,month): rows.append([InlineKeyboardButton(text=" " if d==0 else str(d),callback_data="noop" if d==0 else f"calday:{year:04d}-{month:02d}-{d:02d}") for d in week])
     rows.append([InlineKeyboardButton(text=texts(lang)["cancel"],callback_data="cancel")]); return InlineKeyboardMarkup(inline_keyboard=rows)
 
-def time_kb(lang):
-    vals=["08:00","09:00","12:00","14:00","18:00","20:00","21:00"]; rows=[]
-    for i in range(0,len(vals),2): rows.append([InlineKeyboardButton(text=vals[i],callback_data=f"time:{vals[i]}")]+([InlineKeyboardButton(text=vals[i+1],callback_data=f"time:{vals[i+1]}")] if i+1<len(vals) else []))
-    rows.append([InlineKeyboardButton(text=texts(lang)["cancel"],callback_data="cancel")]); return InlineKeyboardMarkup(inline_keyboard=rows)
+def hour_kb(lang):
+    rows = []
+    for start in range(0, 24, 4):
+        rows.append([
+            InlineKeyboardButton(text=f"{hour:02d}:00", callback_data=f"hour:{hour:02d}")
+            for hour in range(start, start + 4)
+        ])
+    rows.append([
+        InlineKeyboardButton(text=texts(lang)["custom_time"], callback_data="time:custom"),
+    ])
+    rows.append([
+        InlineKeyboardButton(text=texts(lang)["cancel"], callback_data="cancel"),
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def minute_kb(lang, hour):
+    values = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
+    rows = []
+    for start in range(0, len(values), 4):
+        rows.append([
+            InlineKeyboardButton(
+                text=f"{hour:02d}:{minute:02d}",
+                callback_data=f"minute:{hour:02d}:{minute:02d}",
+            )
+            for minute in values[start:start + 4]
+        ])
+    rows.append([
+        InlineKeyboardButton(text=texts(lang)["custom_time"], callback_data="time:custom"),
+    ])
+    rows.append([
+        InlineKeyboardButton(text=texts(lang)["cancel"], callback_data="cancel"),
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 def weekday_kb(lang,selected):
     labels=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"] if lang=="ru" else ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]; rows=[[InlineKeyboardButton(text=("✅ " if i in selected else "")+labels[i],callback_data=f"weekday:{i}")] for i in range(7)]; rows.append([InlineKeyboardButton(text=texts(lang)["saved"],callback_data="weekday:save")]); rows.append([InlineKeyboardButton(text=texts(lang)["cancel"],callback_data="cancel")]); return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -392,13 +422,65 @@ async def cal_day(c:CallbackQuery,state:FSMContext):
     await c.message.edit_text(texts(lang)["time"],reply_markup=time_kb(lang)); await c.answer()
 
 
-@dp.callback_query(Add.time,F.data.startswith("time:"))
-async def add_time(c:CallbackQuery,state:FSMContext):
-    data=await state.get_data(); u=await user(c.from_user.id); tz=tz_of(u); lang=u["language"]
-    dt=datetime.fromisoformat(f"{data['date']}T{c.data.split(':',1)[1]}:00").replace(tzinfo=tz)
-    if dt<=datetime.now(tz): await c.answer(texts(lang)["past"],show_alert=True); return
-    await state.update_data(dt=dt.isoformat()); await state.set_state(Add.repeat)
-    await c.message.edit_text(texts(lang)["repeat"],reply_markup=repeat_kb(lang)); await c.answer()
+@dp.callback_query(Add.time,F.data=="time:custom")
+async def custom_time(c:CallbackQuery,state:FSMContext):
+    lang=(await user(c.from_user.id))["language"]
+    await c.message.edit_text(texts(lang)["custom_time_prompt"],reply_markup=back_kb(lang))
+    await c.answer()
+
+
+@dp.callback_query(Add.time,F.data.startswith("hour:"))
+async def choose_hour(c:CallbackQuery,state:FSMContext):
+    lang=(await user(c.from_user.id))["language"]
+    hour=int(c.data.split(":")[1])
+    await state.update_data(hour=hour)
+    await c.message.edit_text(texts(lang)["choose_minutes"],reply_markup=minute_kb(lang,hour))
+    await c.answer()
+
+
+@dp.callback_query(Add.time,F.data.startswith("minute:"))
+async def choose_minute(c:CallbackQuery,state:FSMContext):
+    data=await state.get_data()
+    u=await user(c.from_user.id)
+    tz=tz_of(u)
+    lang=u["language"]
+
+    _, hour_text, minute_text = c.data.split(":")
+    value=f"{hour_text}:{minute_text}"
+    dt=datetime.fromisoformat(f"{data['date']}T{value}:00").replace(tzinfo=tz)
+
+    if dt <= datetime.now(tz):
+        await c.answer(texts(lang)["past"], show_alert=True)
+        return
+
+    await state.update_data(dt=dt.isoformat())
+    await state.set_state(Add.repeat)
+    await c.message.edit_text(texts(lang)["repeat"],reply_markup=repeat_kb(lang))
+    await c.answer()
+
+
+@dp.message(Add.time)
+async def manual_time(message:Message,state:FSMContext):
+    u=await user(message.from_user.id)
+    lang=u["language"]
+    raw=(message.text or "").strip()
+
+    try:
+        value=datetime.strptime(raw,"%H:%M").strftime("%H:%M")
+    except ValueError:
+        await message.answer(texts(lang)["custom_time_invalid"],reply_markup=back_kb(lang))
+        return
+
+    data=await state.get_data()
+    dt=datetime.fromisoformat(f"{data['date']}T{value}:00").replace(tzinfo=tz_of(u))
+
+    if dt <= datetime.now(tz_of(u)):
+        await message.answer(texts(lang)["past"],reply_markup=back_kb(lang))
+        return
+
+    await state.update_data(dt=dt.isoformat())
+    await state.set_state(Add.repeat)
+    await message.answer(texts(lang)["repeat"],reply_markup=repeat_kb(lang))
 
 
 @dp.callback_query(Add.repeat,F.data=="rep:weekdays")
