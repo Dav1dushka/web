@@ -142,7 +142,7 @@ def tz_kb(lang):
 
 async def db_init():
     async with aiosqlite.connect(DB) as db:
-        await db.execute("CREATE TABLE IF NOT EXISTS users (telegram_id INTEGER PRIMARY KEY, language TEXT NOT NULL DEFAULT 'en', timezone TEXT NOT NULL DEFAULT ?, digest_enabled INTEGER NOT NULL DEFAULT 0, digest_hour INTEGER NOT NULL DEFAULT 9, last_digest_date TEXT)", (DEFAULT_TZ,))
+        await db.execute("CREATE TABLE IF NOT EXISTS users (telegram_id INTEGER PRIMARY KEY, language TEXT NOT NULL DEFAULT 'en', timezone TEXT NOT NULL DEFAULT 'Europe/Prague', digest_enabled INTEGER NOT NULL DEFAULT 0, digest_hour INTEGER NOT NULL DEFAULT 9, last_digest_date TEXT)")
         await db.execute("CREATE TABLE IF NOT EXISTS reminders (id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id INTEGER NOT NULL, title TEXT NOT NULL, reminder_at TEXT NOT NULL, repeat TEXT NOT NULL DEFAULT 'once', category TEXT NOT NULL DEFAULT 'other', sent_at TEXT, share_token TEXT)")
         await db.execute("CREATE TABLE IF NOT EXISTS shared_members (reminder_id INTEGER NOT NULL, telegram_id INTEGER NOT NULL, joined_at TEXT NOT NULL, PRIMARY KEY(reminder_id, telegram_id))")
         for table,col,definition in [
@@ -275,9 +275,15 @@ async def export_ics(uid):
 @dp.message(Command("start"))
 async def start(m:Message,state:FSMContext):
     await state.clear()
+    parts=(m.text or "").split(maxsplit=1)
+    share_token=parts[1].removeprefix("share_") if len(parts)==2 else None
     lang=(await user(m.from_user.id))["language"]
     if not await has_user(m.from_user.id):
+        if share_token:
+            await state.update_data(pending_share=share_token)
         await m.answer("⏰ <b>Reminder Bot</b>\n\nВыберите язык / Choose your language / Scegli la lingua / Оберіть мову:",reply_markup=lang_kb(),parse_mode="HTML"); return
+    if share_token:
+        await share_join(share_token,m.from_user.id)
     await home(m,lang)
 
 
@@ -288,9 +294,16 @@ async def has_user(uid):
 
 
 @dp.callback_query(F.data.startswith("lang:"))
-async def lang_cb(c:CallbackQuery):
-    lang=c.data.split(":")[1]; await set_lang(c.from_user.id,lang)
-    await c.message.edit_text(texts(lang)["lang_saved"]); await home(c.message,lang); await c.answer()
+async def lang_cb(c:CallbackQuery,state:FSMContext):
+    lang=c.data.split(":")[1]
+    data=await state.get_data()
+    await set_lang(c.from_user.id,lang)
+    await state.clear()
+    await c.message.edit_text(texts(lang)["lang_saved"])
+    if data.get("pending_share"):
+        await share_join(data["pending_share"],c.from_user.id)
+    await home(c.message,lang)
+    await c.answer()
 
 
 @dp.callback_query(F.data=="menu:home")
