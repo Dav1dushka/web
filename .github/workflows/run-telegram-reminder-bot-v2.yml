@@ -1,0 +1,87 @@
+name: Run Telegram Reminder Bot V2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bot-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: reminders
+          POSTGRES_USER: reminders
+          POSTGRES_PASSWORD: reminders
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U reminders -d reminders"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
+    env:
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      DATABASE_URL: postgresql+asyncpg://reminders:reminders@localhost:5432/reminders
+      REDIS_URL: redis://localhost:6379/0
+      BOT_TIMEZONE: Europe/Prague
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          cd projects/telegram-reminder-bot
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile backend
+        run: |
+          cd projects/telegram-reminder-bot
+          python -m compileall app v2 bot-v2.py
+
+      - name: Check Telegram token
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          with urllib.request.urlopen(
+              f"https://api.telegram.org/bot{os.environ['BOT_TOKEN']}/getMe",
+              timeout=15,
+          ) as response:
+              data = json.load(response)
+
+          if not data.get("ok"):
+              raise SystemExit(data)
+
+          print("Telegram bot OK:", data["result"]["username"])
+          PY
+
+      - name: Start scheduler
+        run: |
+          cd projects/telegram-reminder-bot
+          python -m app.scheduler > /tmp/reminder-scheduler.log 2>&1 &
+
+      - name: Start notifier
+        run: |
+          cd projects/telegram-reminder-bot
+          python -m app.notifier > /tmp/reminder-notifier.log 2>&1 &
+
+      - name: Start bot
+        run: |
+          cd projects/telegram-reminder-bot
+          python -u bot-v2.py
