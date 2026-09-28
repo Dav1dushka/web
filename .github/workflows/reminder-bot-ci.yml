@@ -1,0 +1,31 @@
+name: Reminder Bot CI
+
+on:
+  push:
+    paths:
+      - "projects/telegram-reminder-bot/**"
+      - ".github/workflows/reminder-bot-ci.yml"
+  pull_request:
+    paths:
+      - "projects/telegram-reminder-bot/**"
+      - ".github/workflows/reminder-bot-ci.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/telegram-reminder-bot
+    env:
+      BOT_TOKEN: test-token
+      BOT_TIMEZONE: Europe/Prague
+      DATABASE_URL: sqlite+aiosqlite:///./ci.db
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m compileall .
+      - run: pytest -q
