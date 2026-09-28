@@ -1,4 +1,5 @@
 import asyncio
+import calendar
 import html
 import os
 import re
@@ -29,7 +30,12 @@ dp = Dispatcher(storage=MemoryStorage())
 class Add(StatesGroup):
     title = State()
     category = State()
-    dt = State()
+    priority = State()
+    date = State()
+    time = State()
+    repeat = State()
+    lead = State()
+    weekdays = State()
 
 
 class Edit(StatesGroup):
@@ -38,6 +44,10 @@ class Edit(StatesGroup):
 
 
 class Smart(StatesGroup):
+    text = State()
+
+
+class Search(StatesGroup):
     text = State()
 
 
@@ -62,7 +72,9 @@ UI = {
 }
 
 
-def texts(lang): return UI.get(lang, UI["en"])
+EXTRA_UI={"ru":{"search":"🔎 Поиск","done_list":"✅ Выполненные","archive":"🗄 Архив","stats":"📊 Статистика","profile":"👤 Профиль","priority":"🎯 Приоритет","lead":"🔔 Заранее","calendar":"📅 Выбери дату","time":"⏰ Выбери время","weekdays":"📆 По дням недели","choose_days":"Выбери дни недели","completed":"✅ Выполненные","archived":"🗄 Архив","stats_title":"📊 Статистика","profile_title":"👤 Профиль","lead_values":{"0":"В момент","10":"За 10 мин","60":"За 1 час","1440":"За 1 день","10080":"За неделю"},"priority_values":{"high":"🔴 Высокий","medium":"🟡 Средний","low":"🟢 Низкий"}},"en":{"search":"🔎 Search","done_list":"✅ Completed","archive":"🗄 Archive","stats":"📊 Stats","profile":"👤 Profile","priority":"🎯 Priority","lead":"🔔 Notify before","calendar":"📅 Choose a date","time":"⏰ Choose a time","weekdays":"📆 Days of week","choose_days":"Choose weekdays","completed":"✅ Completed","archived":"🗄 Archive","stats_title":"📊 Stats","profile_title":"👤 Profile","lead_values":{"0":"At event","10":"10 min before","60":"1 hour before","1440":"1 day before","10080":"1 week before"},"priority_values":{"high":"🔴 High","medium":"🟡 Medium","low":"🟢 Low"}},"it":{"search":"🔎 Cerca","done_list":"✅ Completati","archive":"🗄 Archivio","stats":"📊 Statistiche","profile":"👤 Profilo","priority":"🎯 Priorità","lead":"🔔 Avvisa prima","calendar":"📅 Scegli la data","time":"⏰ Scegli l'ora","weekdays":"📆 Giorni","choose_days":"Scegli i giorni","completed":"✅ Completati","archived":"🗄 Archivio","stats_title":"📊 Statistiche","profile_title":"👤 Profilo","lead_values":{"0":"All'evento","10":"10 min prima","60":"1 ora prima","1440":"1 giorno prima","10080":"1 settimana prima"},"priority_values":{"high":"🔴 Alta","medium":"🟡 Media","low":"🟢 Bassa"}},"uk":{"search":"🔎 Пошук","done_list":"✅ Виконані","archive":"🗄 Архів","stats":"📊 Статистика","profile":"👤 Профіль","priority":"🎯 Пріоритет","lead":"🔔 Повідомити за","calendar":"📅 Обери дату","time":"⏰ Обери час","weekdays":"📆 Дні тижня","choose_days":"Обери дні","completed":"✅ Виконані","archived":"🗄 Архів","stats_title":"📊 Статистика","profile_title":"👤 Профіль","lead_values":{"0":"У момент","10":"За 10 хв","60":"За 1 год","1440":"За 1 день","10080":"За тиждень"},"priority_values":{"high":"🔴 Високий","medium":"🟡 Середній","low":"🟢 Низький"}}}
+def texts(lang):
+    x=dict(UI.get(lang,UI["en"])); x.update(EXTRA_UI.get(lang,{})); return x
 
 
 def lang_kb():
@@ -73,13 +85,15 @@ def lang_kb():
 
 
 def main_kb(lang):
-    t = texts(lang)
+    t=texts(lang)
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=t["add"], callback_data="menu:add")],
         [InlineKeyboardButton(text=t["list"], callback_data="menu:list"), InlineKeyboardButton(text=t["today"], callback_data="menu:today")],
-        [InlineKeyboardButton(text=t["smart"], callback_data="menu:smart"), InlineKeyboardButton(text=t["export"], callback_data="menu:export")],
-        [InlineKeyboardButton(text=t["settings"], callback_data="menu:settings"), InlineKeyboardButton(text=t["lang"], callback_data="menu:lang")],
-        [InlineKeyboardButton(text=t["help"], callback_data="menu:help")],
+        [InlineKeyboardButton(text=t["search"], callback_data="menu:search"), InlineKeyboardButton(text=t["smart"], callback_data="menu:smart")],
+        [InlineKeyboardButton(text=t["done_list"], callback_data="menu:done"), InlineKeyboardButton(text=t["archive"], callback_data="menu:archive")],
+        [InlineKeyboardButton(text=t["stats"], callback_data="menu:stats"), InlineKeyboardButton(text=t["profile"], callback_data="menu:profile")],
+        [InlineKeyboardButton(text=t["settings"], callback_data="menu:settings"), InlineKeyboardButton(text=t["export"], callback_data="menu:export")],
+        [InlineKeyboardButton(text=t["lang"], callback_data="menu:lang"), InlineKeyboardButton(text=t["help"], callback_data="menu:help")],
     ])
 
 
@@ -104,6 +118,7 @@ def repeat_kb(lang):
         [InlineKeyboardButton(text=t["once"], callback_data="rep:once"), InlineKeyboardButton(text=t["daily"], callback_data="rep:daily")],
         [InlineKeyboardButton(text=t["2d"], callback_data="rep:2d"), InlineKeyboardButton(text=t["week"], callback_data="rep:week")],
         [InlineKeyboardButton(text=t["month"], callback_data="rep:month"), InlineKeyboardButton(text=t["year"], callback_data="rep:year")],
+        [InlineKeyboardButton(text=t["weekdays"], callback_data="rep:weekdays")],
         [InlineKeyboardButton(text=t["cancel"], callback_data="cancel")],
     ])
 
@@ -140,14 +155,39 @@ def tz_kb(lang):
     ])
 
 
+
+
+def priority_kb(lang):
+    t=texts(lang); return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=t["priority_values"]["high"],callback_data="priority:high")],[InlineKeyboardButton(text=t["priority_values"]["medium"],callback_data="priority:medium")],[InlineKeyboardButton(text=t["priority_values"]["low"],callback_data="priority:low")],[InlineKeyboardButton(text=t["cancel"],callback_data="cancel")]])
+
+def lead_kb(lang):
+    t=texts(lang); return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=t["lead_values"]["0"],callback_data="lead:0")],[InlineKeyboardButton(text=t["lead_values"]["10"],callback_data="lead:10"),InlineKeyboardButton(text=t["lead_values"]["60"],callback_data="lead:60")],[InlineKeyboardButton(text=t["lead_values"]["1440"],callback_data="lead:1440"),InlineKeyboardButton(text=t["lead_values"]["10080"],callback_data="lead:10080")]])
+
+def calendar_kb(lang,year,month):
+    rows=[[InlineKeyboardButton(text="‹",callback_data=f"calnav:{year}:{month}:prev"),InlineKeyboardButton(text=f"{year}-{month:02d}",callback_data="noop"),InlineKeyboardButton(text="›",callback_data=f"calnav:{year}:{month}:next")]]
+    for week in calendar.monthcalendar(year,month): rows.append([InlineKeyboardButton(text=" " if d==0 else str(d),callback_data="noop" if d==0 else f"calday:{year:04d}-{month:02d}-{d:02d}") for d in week])
+    rows.append([InlineKeyboardButton(text=texts(lang)["cancel"],callback_data="cancel")]); return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def time_kb(lang):
+    vals=["08:00","09:00","12:00","14:00","18:00","20:00","21:00"]; rows=[]
+    for i in range(0,len(vals),2): rows.append([InlineKeyboardButton(text=vals[i],callback_data=f"time:{vals[i]}")]+([InlineKeyboardButton(text=vals[i+1],callback_data=f"time:{vals[i+1]}")] if i+1<len(vals) else []))
+    rows.append([InlineKeyboardButton(text=texts(lang)["cancel"],callback_data="cancel")]); return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def weekday_kb(lang,selected):
+    labels=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"] if lang=="ru" else ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]; rows=[[InlineKeyboardButton(text=("✅ " if i in selected else "")+labels[i],callback_data=f"weekday:{i}")] for i in range(7)]; rows.append([InlineKeyboardButton(text=texts(lang)["saved"],callback_data="weekday:save")]); rows.append([InlineKeyboardButton(text=texts(lang)["cancel"],callback_data="cancel")]); return InlineKeyboardMarkup(inline_keyboard=rows)
+
 async def db_init():
     async with aiosqlite.connect(DB) as db:
         await db.execute("CREATE TABLE IF NOT EXISTS users (telegram_id INTEGER PRIMARY KEY, language TEXT NOT NULL DEFAULT 'en', timezone TEXT NOT NULL DEFAULT 'Europe/Prague', digest_enabled INTEGER NOT NULL DEFAULT 0, digest_hour INTEGER NOT NULL DEFAULT 9, last_digest_date TEXT)")
-        await db.execute("CREATE TABLE IF NOT EXISTS reminders (id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id INTEGER NOT NULL, title TEXT NOT NULL, reminder_at TEXT NOT NULL, repeat TEXT NOT NULL DEFAULT 'once', category TEXT NOT NULL DEFAULT 'other', sent_at TEXT, share_token TEXT)")
+        await db.execute("CREATE TABLE IF NOT EXISTS reminders (id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id INTEGER NOT NULL, title TEXT NOT NULL, reminder_at TEXT NOT NULL, repeat TEXT NOT NULL DEFAULT 'once', category TEXT NOT NULL DEFAULT 'other', priority TEXT NOT NULL DEFAULT 'medium', lead_minutes TEXT NOT NULL DEFAULT '0', status TEXT NOT NULL DEFAULT 'active', notified_leads TEXT NOT NULL DEFAULT '', sent_at TEXT, share_token TEXT)")
         await db.execute("CREATE TABLE IF NOT EXISTS shared_members (reminder_id INTEGER NOT NULL, telegram_id INTEGER NOT NULL, joined_at TEXT NOT NULL, PRIMARY KEY(reminder_id, telegram_id))")
         for table,col,definition in [
             ("reminders","category","TEXT NOT NULL DEFAULT 'other'"),
             ("reminders","share_token","TEXT"),
+            ("reminders","priority","TEXT NOT NULL DEFAULT 'medium'"),
+            ("reminders","lead_minutes","TEXT NOT NULL DEFAULT '0'"),
+            ("reminders","status","TEXT NOT NULL DEFAULT 'active'"),
+            ("reminders","notified_leads","TEXT NOT NULL DEFAULT ''"),
             ("users","timezone",f"TEXT NOT NULL DEFAULT '{DEFAULT_TZ}'"),
             ("users","digest_enabled","INTEGER NOT NULL DEFAULT 0"),
             ("users","digest_hour","INTEGER NOT NULL DEFAULT 9"),
