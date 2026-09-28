@@ -7,49 +7,35 @@ jobs:
   bot:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     env:
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
       BOT_TIMEZONE: Europe/Prague
       PYTHONUNBUFFERED: "1"
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install dependencies
         run: |
           cd projects/telegram-reminder-bot
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Check Telegram token
         run: |
           python - <<'PY'
-          import json
-          import os
-          import urllib.request
-
-          token = os.environ["BOT_TOKEN"]
-          url = f"https://api.telegram.org/bot{token}/getMe"
-
-          with urllib.request.urlopen(url, timeout=15) as response:
-              data = json.load(response)
-
+          import json, os, urllib.request
+          token=os.environ["BOT_TOKEN"]
+          with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/getMe", timeout=15) as r:
+              data=json.load(r)
           if not data.get("ok"):
-              raise SystemExit(f"Telegram API error: {data}")
-
-          print(
-              "Telegram bot OK:",
-              data["result"].get("username", "unknown")
-          )
+              raise SystemExit(data)
+          print("Telegram bot OK:", data["result"]["username"])
           PY
-
       - name: Start bot
         run: |
           cd projects/telegram-reminder-bot
