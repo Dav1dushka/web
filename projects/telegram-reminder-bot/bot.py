@@ -442,7 +442,7 @@ async def cancel_cb(c:CallbackQuery,state:FSMContext):
 async def list_cb(c:CallbackQuery):
     u=await user(c.from_user.id); lang=u["language"]; tz=tz_of(u)
     async with aiosqlite.connect(DB) as db:
-        q="SELECT DISTINCT r.id,r.title,r.reminder_at,r.repeat,r.category,r.telegram_id FROM reminders r LEFT JOIN shared_members s ON s.reminder_id=r.id WHERE r.telegram_id=? OR s.telegram_id=? ORDER BY r.reminder_at"
+        q="SELECT DISTINCT r.id,r.title,r.reminder_at,r.repeat,r.category,r.telegram_id FROM reminders r LEFT JOIN shared_members s ON s.reminder_id=r.id WHERE r.status='active' AND (r.telegram_id=? OR s.telegram_id=?) ORDER BY r.reminder_at"
         rows=await (await db.execute(q,(c.from_user.id,c.from_user.id))).fetchall()
     if not rows: await c.message.edit_text(texts(lang)["empty"],reply_markup=back_kb(lang)); await c.answer(); return
     await c.message.edit_text(texts(lang)["list"],reply_markup=back_kb(lang))
@@ -456,7 +456,7 @@ async def list_cb(c:CallbackQuery):
 async def del_cb(c:CallbackQuery):
     rid=int(c.data.split(":")[1]); lang=(await user(c.from_user.id))["language"]
     async with aiosqlite.connect(DB) as db:
-        cur=await db.execute("DELETE FROM reminders WHERE id=? AND telegram_id=?",(rid,c.from_user.id)); await db.commit()
+        cur=await db.execute("UPDATE reminders SET status='archived' WHERE id=? AND telegram_id=?",(rid,c.from_user.id)); await db.commit()
     await c.answer(texts(lang)["deleted"] if cur.rowcount else texts(lang)["notfound"],show_alert=cur.rowcount==0)
 
 
@@ -576,7 +576,7 @@ async def snooze(c:CallbackQuery):
         row=await (await db.execute("SELECT title,category FROM reminders WHERE id=?",(rid,))).fetchone()
         if not row: await c.answer(texts(u["language"])["notfound"],show_alert=True); return
         dt=datetime.now(tz_of(u))+timedelta(minutes=mins)
-        await db.execute("INSERT INTO reminders(telegram_id,title,reminder_at,repeat,category) VALUES(?,?,?,?,?)",(c.from_user.id,row[0],dt.isoformat(),"once",row[1])); await db.commit()
+        await db.execute("INSERT INTO reminders(telegram_id,title,reminder_at,repeat,category,priority,lead_minutes,status,notified_leads) VALUES(?,?,?,?,?,?,?,?,?)",(c.from_user.id,row[0],dt.isoformat(),"once",row[1],"medium","0","active","")); await db.commit()
     await c.message.edit_reply_markup(reply_markup=None); await c.answer("✅")
 
 
@@ -584,7 +584,7 @@ async def snooze(c:CallbackQuery):
 async def done(c:CallbackQuery):
     _,rid=c.data.split(":"); u=await user(c.from_user.id)
     async with aiosqlite.connect(DB) as db:
-        await db.execute("UPDATE reminders SET sent_at=? WHERE id=? AND repeat='once'",(datetime.now(timezone.utc).isoformat(),int(rid))); await db.commit()
+        await db.execute("UPDATE reminders SET status='completed',sent_at=? WHERE id=? AND repeat='once'",(datetime.now(timezone.utc).isoformat(),int(rid))); await db.commit()
     await c.message.edit_reply_markup(reply_markup=None); await c.answer(texts(u["language"])["done"])
 
 
@@ -618,17 +618,80 @@ async def worker(bot):
         await digest(bot)
         now=datetime.now(timezone.utc)
         async with aiosqlite.connect(DB) as db:
-            rows=await (await db.execute("SELECT id,telegram_id,title,reminder_at,repeat,category FROM reminders WHERE sent_at IS NULL ORDER BY reminder_at")).fetchall()
-            for rid,owner,title,dt,rep,cat in rows:
-                if datetime.fromisoformat(dt).astimezone(timezone.utc) > now:
-                    continue
-                for uid in await recipients(rid,owner):
-                    u=await user(uid)
-                    local=datetime.fromisoformat(dt).astimezone(tz_of(u))
-                    await bot.send_message(uid,f"<b>🔔 Reminder</b>\n\n{CAT.get(cat,CAT['other'])[0]} {html.escape(title)}\n⏰ {local:%d.%m.%Y %H:%M}",parse_mode="HTML",reply_markup=action_kb(u["language"],rid))
-                nxt=next_dt(datetime.fromisoformat(dt),rep)
-                if nxt is None: await db.execute("UPDATE reminders SET sent_at=? WHERE id=?",(datetime.now(timezone.utc).isoformat(),rid))
-                else: await db.execute("UPDATE reminders SET reminder_at=? WHERE id=?",(nxt.isoformat(),rid))
+            rows=await (await db.execute("SELECT id,telegram_id,title,reminder_at,repeat,category,lead_minutes,notified_leads FROM reminders WHERE status='active' ORDER BY reminder_at")).fetchall()
+            for rid,owner,title,dt_text,rep,cat,lead_text,notified in rows:
+                dt=datetime.fromisoformat(dt_text)
+                if dt.tzinfo is None: dt=dt.replace(tzinfo=timezone.utc)
+                for lead in [int(x) for x in (lead_text or "0").split(",") if x.strip().isdigit()]:
+                    if now < dt-timedelta(minutes=lead) or f",{lead}," in f",{notified},":
+                        continue
+                    for uid in await recipients(rid,owner):
+                        u=await user(uid); local=dt.astimezone(tz_of(u))
+                        await bot.send_message(uid,f"<b>{texts(u['language'])['reminder']}</b>\n\n{CAT.get(cat,CAT['other'])[0]} {html.escape(title)}\n⏰ {local:%d.%m.%Y %H:%M}",parse_mode="HTML",reply_markup=action_kb(u["language"],rid))
+                    updated=(notified+","+str(lead)).strip(",")
+                    await d@dp.callback_query(F.data=="menu:search")
+async def menu_search(c:CallbackQuery,state:FSMContext):
+    lang=(await user(c.from_user.id))["language"]; await state.set_state(Search.text)
+    await c.message.edit_text(texts(lang)["search"],reply_markup=back_kb(lang)); await c.answer()
+
+
+@dp.message(Search.text)
+async def search_text(m:Message,state:FSMContext):
+    u=await user(m.from_user.id); lang=u["language"]
+    async with aiosqlite.connect(DB) as db:
+        rows=await (await db.execute("SELECT id,title,reminder_at,status,category FROM reminders WHERE telegram_id=? AND lower(title) LIKE ? ORDER BY reminder_at DESC LIMIT 30",(m.from_user.id,f"%{m.text.lower()}%"))).fetchall()
+    await state.clear()
+    if not rows:
+        await m.answer(texts(lang)["empty"],reply_markup=back_kb(lang)); return
+    for rid,title,dt,status,cat in rows:
+        await m.answer(f"#{rid} {CAT.get(cat,CAT['other'])[0]} <b>{html.escape(title)}</b>\n{status} · {datetime.fromisoformat(dt).astimezone(tz_of(u)):%d.%m.%Y %H:%M}",reply_markup=list_actions(lang,rid),parse_mode="HTML")
+
+
+@dp.callback_query(F.data=="menu:done")
+async def menu_done(c:CallbackQuery):
+    lang=(await user(c.from_user.id))["language"]
+    async with aiosqlite.connect(DB) as db:
+        rows=await (await db.execute("SELECT id,title FROM reminders WHERE telegram_id=? AND status='completed' ORDER BY id DESC",(c.from_user.id,))).fetchall()
+    text=texts(lang)["completed"] if rows else texts(lang)["empty"]
+    if rows: text+="\n\n"+"\n".join(f"✅ #{rid} · {html.escape(title)}" for rid,title in rows)
+    await c.message.edit_text(text,reply_markup=back_kb(lang),parse_mode="HTML"); await c.answer()
+
+
+@dp.callback_query(F.data=="menu:archive")
+async def menu_archive(c:CallbackQuery):
+    lang=(await user(c.from_user.id))["language"]
+    async with aiosqlite.connect(DB) as db:
+        rows=await (await db.execute("SELECT id,title FROM reminders WHERE telegram_id=? AND status='archived' ORDER BY id DESC",(c.from_user.id,))).fetchall()
+    text=texts(lang)["archived"] if rows else texts(lang)["empty"]
+    if rows: text+="\n\n"+"\n".join(f"🗄 #{rid} · {html.escape(title)}" for rid,title in rows)
+    await c.message.edit_text(text,reply_markup=back_kb(lang),parse_mode="HTML"); await c.answer()
+
+
+@dp.callback_query(F.data=="menu:stats")
+async def menu_stats(c:CallbackQuery):
+    lang=(await user(c.from_user.id))["language"]
+    async with aiosqlite.connect(DB) as db:
+        active=await (await db.execute("SELECT COUNT(*) FROM reminders WHERE telegram_id=? AND status='active'",(c.from_user.id,))).fetchone()
+        completed=await (await db.execute("SELECT COUNT(*) FROM reminders WHERE telegram_id=? AND status='completed'",(c.from_user.id,))).fetchone()
+        archived=await (await db.execute("SELECT COUNT(*) FROM reminders WHERE telegram_id=? AND status='archived'",(c.from_user.id,))).fetchone()
+    await c.message.edit_text(f"<b>{texts(lang)['stats_title']}</b>\n\n⏰ {active[0]}\n✅ {completed[0]}\n🗄 {archived[0]}",reply_markup=back_kb(lang),parse_mode="HTML"); await c.answer()
+
+
+@dp.callback_query(F.data=="menu:profile")
+async def menu_profile(c:CallbackQuery):
+    u=await user(c.from_user.id); lang=u["language"]
+    async with aiosqlite.connect(DB) as db: total=await (await db.execute("SELECT COUNT(*) FROM reminders WHERE telegram_id=?",(c.from_user.id,))).fetchone()
+    await c.message.edit_text(f"<b>{texts(lang)['profile_title']}</b>\n\n🌐 {lang}\n🌍 {u['timezone']}\n📅 {total[0]}",reply_markup=back_kb(lang),parse_mode="HTML"); await c.answer()
+
+
+b.execute("UPDATE reminders SET notified_leads=? WHERE id=?",(updated,rid))
+                    if lead==0:
+                        nxt=next_dt(dt,rep)
+                        if nxt is None:
+                            await db.execute("UPDATE reminders SET status='completed',sent_at=? WHERE id=?",(datetime.now(timezone.utc).isoformat(),rid))
+                        else:
+                            await db.execute("UPDATE reminders SET reminder_at=?,notified_leads='' WHERE id=?",(nxt.isoformat(),rid))
+                        break
             await db.commit()
         await asyncio.sleep(CHECK)
 
