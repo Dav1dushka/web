@@ -18,6 +18,56 @@ services:
     ports:
       - "6379:6379"
 
+  bot:
+    build:
+      context: .
+      dockerfile: v2/Dockerfile
+    command: ["python", "bot-v2.py"]
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      DATABASE_URL: postgresql+asyncpg://reminders:reminders@postgres:5432/reminders
+      REDIS_URL: redis://redis:6379/0
+      BOT_TIMEZONE: Europe/Prague
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: v2/Dockerfile
+    command: ["python", "-m", "app.scheduler"]
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      DATABASE_URL: postgresql+asyncpg://reminders:reminders@postgres:5432/reminders
+      REDIS_URL: redis://redis:6379/0
+      BOT_TIMEZONE: Europe/Prague
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  notifier:
+    build:
+      context: .
+      dockerfile: v2/Dockerfile
+    command: ["python", "-m", "app.notifier"]
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      DATABASE_URL: postgresql+asyncpg://reminders:reminders@postgres:5432/reminders
+      REDIS_URL: redis://redis:6379/0
+      BOT_TIMEZONE: Europe/Prague
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   api:
     build:
       context: .
@@ -30,14 +80,3 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-
-  worker:
-    build:
-      context: .
-      dockerfile: v2/Dockerfile
-    command: ["python", "-m", "v2.worker"]
-    environment:
-      REDIS_URL: redis://redis:6379/0
-    depends_on:
-      redis:
-        condition: service_started
