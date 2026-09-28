@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reminder Bot Admin</title>
+<style>
+body{font-family:system-ui;margin:40px;background:#111827;color:#f3f4f6}
+main{max-width:1000px;margin:auto}
+table{width:100%;border-collapse:collapse;background:#1f2937}
+th,td{padding:10px;border-bottom:1px solid #374151;text-align:left}
+</style>
+</head>
+<body>
+<main>
+<h1>Reminder Bot Admin</h1>
+<table>
+<thead><tr><th>ID</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th></tr></thead>
+<tbody id="rows"></tbody>
+</table>
+</main>
+<script>
+fetch("/api/reminders")
+.then(r => r.json())
+.then(items => {
+  document.querySelector("#rows").innerHTML = items.map(x =>
+    "<tr><td>"+x.id+"</td><td>"+x.title+"</td><td>"+x.category+"</td><td>"+x.priority+"</td><td>"+x.status+"</td></tr>"
+  ).join("");
+});
+</script>
+</body>
+</html>
