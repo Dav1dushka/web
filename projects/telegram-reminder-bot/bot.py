@@ -267,12 +267,15 @@ async def main():
 
     await init_db()
 
-    bot = Bot(token=token)
+    async with Bot(token=token) as bot:
+        await bot.delete_webhook(drop_pending_updates=False)
+        me = await bot.get_me()
+        print(f"Bot started: @{me.username}", flush=True)
 
-    await asyncio.gather(
-        dp.start_polling(bot),
-        deliver_reminders(bot),
-    )
+        await asyncio.gather(
+            dp.start_polling(bot),
+            deliver_reminders(bot),
+        )
 
 
 if __name__ == "__main__":
