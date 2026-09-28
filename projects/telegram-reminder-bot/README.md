@@ -1,31 +1,27 @@
 # Telegram Reminder Bot
 
-A small Telegram bot for reminders.
+A Telegram bot for reminders.
 
-I made it to practice async Python, SQLite and background jobs.
+I built it to practice async Python, SQLite and Telegram APIs.
 
-### Example
+### What it can do
 
-```
-/add 2026-10-27 09:00 | Mom's birthday | yearly
-```
-
-The bot stores the reminder and sends a Telegram message when the time comes.
-
-### Commands
-
-```
-/add
-/list
-/today
-/delete
-/help
-```
+- repeating reminders
+- snooze notifications
+- edit and delete reminders
+- categories
+- time zones
+- morning digest
+- natural language input
+- optional OpenAI parsing
+- .ics calendar export
+- shared reminders
+- Russian, English, Italian and Ukrainian
 
 ### Built with
 
-Python · aiogram · SQLite
+Python · aiogram · SQLite · OpenAI API (optional)
 
-The bot supports one-time reminders and yearly reminders.
+### Note
 
-For now it uses the server's local time. A timezone setting would be a good next step.
+The demo currently runs on GitHub Actions, so SQLite data is not persistent between workflow runs. For real long-term use, the next step is PostgreSQL or another persistent database.
