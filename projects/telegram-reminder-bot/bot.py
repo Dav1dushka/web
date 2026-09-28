@@ -365,26 +365,72 @@ async def add_title(m:Message,state:FSMContext):
 
 @dp.callback_query(Add.category,F.data.startswith("cat:"))
 async def add_cat(c:CallbackQuery,state:FSMContext):
-    lang=(await user(c.from_user.id))["language"]; await state.update_data(category=c.data.split(":")[1]); await state.set_state(Add.dt)
-    await c.message.edit_text(texts(lang)["dt"],reply_markup=back_kb(lang),parse_mode="HTML"); await c.answer()
+    lang=(await user(c.from_user.id))["language"]; await state.update_data(category=c.data.split(":")[1]); await state.set_state(Add.priority)
+    await c.message.edit_text(texts(lang)["priority"],reply_markup=priority_kb(lang)); await c.answer()
 
 
-@dp.message(Add.dt)
-async def add_dt(m:Message,state:FSMContext):
-    u=await user(m.from_user.id); lang=u["language"]; tz=tz_of(u)
-    try: dt=parse_dt(m.text,tz)
-    except: await m.answer(texts(lang)["dt"],parse_mode="HTML"); return
-    if dt<=datetime.now(tz): await m.answer(texts(lang)["past"]); return
-    await state.update_data(dt=dt.isoformat()); await m.answer(texts(lang)["repeat"],reply_markup=repeat_kb(lang))
+@dp.callback_query(Add.priority,F.data.startswith("priority:"))
+async def add_priority(c:CallbackQuery,state:FSMContext):
+    lang=(await user(c.from_user.id))["language"]; await state.update_data(priority=c.data.split(":")[1])
+    tz=tz_of(await user(c.from_user.id)); now=datetime.now(tz); await state.set_state(Add.date)
+    await c.message.edit_text(texts(lang)["calendar"],reply_markup=calendar_kb(lang,now.year,now.month)); await c.answer()
 
 
-@dp.callback_query(F.data.startswith("rep:"))
+@dp.callback_query(Add.date,F.data.startswith("calnav:"))
+async def cal_nav(c:CallbackQuery,state:FSMContext):
+    _,y,m,direction=c.data.split(":"); y=int(y); m=int(m)
+    if direction=="prev": m-=1; y=y-1 if m==0 else y; m=12 if m==0 else m
+    else: m+=1; y=y+1 if m==13 else y; m=1 if m==13 else m
+    lang=(await user(c.from_user.id))["language"]; await c.message.edit_reply_markup(reply_markup=calendar_kb(lang,y,m)); await c.answer()
+
+
+@dp.callback_query(Add.date,F.data.startswith("calday:"))
+async def cal_day(c:CallbackQuery,state:FSMContext):
+    await state.update_data(date=c.data.split(":",1)[1]); lang=(await user(c.from_user.id))["language"]; await state.set_state(Add.time)
+    await c.message.edit_text(texts(lang)["time"],reply_markup=time_kb(lang)); await c.answer()
+
+
+@dp.callback_query(Add.time,F.data.startswith("time:"))
+async def add_time(c:CallbackQuery,state:FSMContext):
+    data=await state.get_data(); u=await user(c.from_user.id); tz=tz_of(u); lang=u["language"]
+    dt=datetime.fromisoformat(f"{data['date']}T{c.data.split(':',1)[1]}:00").replace(tzinfo=tz)
+    if dt<=datetime.now(tz): await c.answer(texts(lang)["past"],show_alert=True); return
+    await state.update_data(dt=dt.isoformat()); await state.set_state(Add.repeat)
+    await c.message.edit_text(texts(lang)["repeat"],reply_markup=repeat_kb(lang)); await c.answer()
+
+
+@dp.callback_query(Add.repeat,F.data=="rep:weekdays")
+async def custom_weekdays(c:CallbackQuery,state:FSMContext):
+    lang=(await user(c.from_user.id))["language"]; await state.update_data(weekdays=[]); await state.set_state(Add.weekdays)
+    await c.message.edit_text(texts(lang)["choose_days"],reply_markup=weekday_kb(lang,set())); await c.answer()
+
+
+@dp.callback_query(Add.weekdays,F.data.startswith("weekday:"))
+async def choose_weekday(c:CallbackQuery,state:FSMContext):
+    lang=(await user(c.from_user.id))["language"]; data=await state.get_data(); selected=set(data.get("weekdays",[])); v=c.data.split(":")[1]
+    if v=="save":
+        if not selected: await c.answer("Select a day",show_alert=True); return
+        await state.update_data(repeat="weekly:"+",".join(map(str,sorted(selected)))); await state.set_state(Add.lead)
+        await c.message.edit_text(texts(lang)["lead"],reply_markup=lead_kb(lang)); await c.answer(); return
+    selected.symmetric_difference_update({int(v)}); await state.update_data(weekdays=list(selected)); await c.message.edit_reply_markup(reply_markup=weekday_kb(lang,selected)); await c.answer()
+
+
+@dp.callback_query(Add.repeat,F.data.startswith("rep:"))
 async def add_rep(c:CallbackQuery,state:FSMContext):
-    lang=(await user(c.from_user.id))["language"]; rep=c.data.split(":")[1]; data=await state.get_data()
-    if rep not in texts(lang)["repeat_names"]: await c.answer(); return
+    rep=c.data.split(":")[1]
+    if rep=="weekdays": return
+    lang=(await user(c.from_user.id))["language"]; await state.update_data(repeat=rep); await state.set_state(Add.lead)
+    await c.message.edit_text(texts(lang)["lead"],reply_markup=lead_kb(lang)); await c.answer()
+
+
+@dp.callback_query(Add.lead,F.data.startswith("lead:"))
+async def choose_lead(c:CallbackQuery,state:FSMContext):
+    lang=(await user(c.from_user.id))["language"]; data=await state.get_data(); lead=int(c.data.split(":")[1])
     async with aiosqlite.connect(DB) as db:
-        await db.execute("INSERT INTO reminders(telegram_id,title,reminder_at,repeat,category) VALUES(?,?,?,?,?)",(c.from_user.id,data["title"],data["dt"],rep,data.get("category","other"))); await db.commit()
-    await state.clear(); await c.message.edit_text(f"<b>{texts(lang)['added']}</b>\n\n📝 {html.escape(data['title'])}\n🔁 {texts(lang)['repeat_names'][rep]}",reply_markup=main_kb(lang),parse_mode="HTML"); await c.answer()
+        await db.execute("INSERT INTO reminders(telegram_id,title,reminder_at,repeat,category,priority,lead_minutes,status,notified_leads) VALUES(?,?,?,?,?,?,?,?,?)",(c.from_user.id,data["title"],data["dt"],data.get("repeat","once"),data.get("category","other"),data.get("priority","medium"),str(lead),"active",""))
+        await db.commit()
+    await state.clear()
+    await c.message.edit_text(f"<b>{texts(lang)['added']}</b>\n\n📝 {html.escape(data['title'])}\n🎯 {texts(lang)['priority_values'][data.get('priority','medium')]}\n🔔 {texts(lang)['lead_values'][str(lead)]}",reply_markup=main_kb(lang),parse_mode="HTML"); await c.answer()
 
 
 @dp.callback_query(F.data=="cancel")
