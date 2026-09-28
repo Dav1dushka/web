@@ -419,7 +419,7 @@ async def cal_nav(c:CallbackQuery,state:FSMContext):
 @dp.callback_query(Add.date,F.data.startswith("calday:"))
 async def cal_day(c:CallbackQuery,state:FSMContext):
     await state.update_data(date=c.data.split(":",1)[1]); lang=(await user(c.from_user.id))["language"]; await state.set_state(Add.time)
-    await c.message.edit_text(texts(lang)["time"],reply_markup=time_kb(lang)); await c.answer()
+    await c.message.edit_text(texts(lang)["time"],reply_markup=hour_kb(lang)); await c.answer()
 
 
 @dp.callback_query(Add.time,F.data=="time:custom")
