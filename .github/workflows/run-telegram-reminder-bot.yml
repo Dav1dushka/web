@@ -1,0 +1,32 @@
+name: Run Telegram Reminder Bot
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      BOT_TIMEZONE: Europe/Prague
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          cd projects/telegram-reminder-bot
+          pip install -r requirements.txt
+
+      - name: Start bot
+        run: |
+          cd projects/telegram-reminder-bot
+          python bot.py
