@@ -1,0 +1,25 @@
+name: SOC Triage Desk tests
+
+on:
+  push:
+    paths:
+      - 'projects/soc-triage-desk/**'
+      - '.github/workflows/soc-triage-desk.yml'
+  pull_request:
+    paths:
+      - 'projects/soc-triage-desk/**'
+      - '.github/workflows/soc-triage-desk.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/soc-triage-desk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - run: pytest -q

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Local authentication-log analysis and security incident triage dashboard">
+  <title>SOC Triage Desk</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand-mark">SOC</div>
+      <div>
+        <p class="eyebrow">SECURITY OPERATIONS WORKBENCH</p>
+        <h1>SOC Triage Desk</h1>
+        <p class="subtitle">Authentication log analysis · Detection rules · Incident review</p>
+      </div>
+      <span class="local-pill">LOCAL ANALYSIS</span>
+    </header>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">DEFENSIVE SECURITY TOOL</p>
+        <h2>Turn raw authentication logs into actionable leads.</h2>
+        <p>Paste a Linux SSH / authentication log sample to normalize events, apply transparent detection rules and review evidence for each alert.</p>
+      </div>
+      <div class="hero-art" aria-hidden="true">⌁</div>
+    </section>
+    <section class="layout">
+      <div class="main-column">
+        <section class="panel">
+          <div class="heading">
+            <div><p class="eyebrow">LOG INGESTION</p><h2>Analyze a log sample</h2></div>
+            <button id="sample-btn" class="secondary" type="button">Load sample</button>
+          </div>
+          <label class="field">Source / file label
+            <input id="source-name" value="Linux authentication sample" maxlength="120">
+          </label>
+          <label class="field">Log content
+            <textarea id="log-input" spellcheck="false" placeholder="Paste supported Linux SSH or sudo log lines here…"></textarea>
+          </label>
+          <div class="actions">
+            <button id="analyze-btn" type="button">Analyze logs</button>
+            <span id="message" role="status" class="message"></span>
+          </div>
+          <p class="hint">Supported patterns include SSH failed / successful logins, invalid users and sudo command events. Input is processed locally by this application.</p>
+        </section>
+        <section class="panel">
+          <div class="heading">
+            <div><p class="eyebrow">DETECTION OUTPUT</p><h2>Incident queue</h2></div>
+            <span id="incident-total" class="count-pill">0 incidents</span>
+          </div>
+          <div id="incidents" class="incident-list"><p class="muted">Run an analysis to see detected incidents.</p></div>
+        </section>
+        <section class="panel">
+          <div class="heading">
+            <div><p class="eyebrow">NORMALIZED DATA</p><h2>Parsed events</h2></div>
+            <span id="event-total" class="count-pill">0 events</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Time</th><th>Type</th><th>User</th><th>Source IP</th><th>Host</th></tr></thead>
+              <tbody id="events"><tr><td colspan="5" class="muted">No events parsed yet.</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <aside class="side-column">
+        <section class="summary-card">
+          <p class="eyebrow">ANALYSIS SUMMARY</p>
+          <div class="metric"><span>Log lines</span><strong id="metric-lines">0</strong></div>
+          <div class="metric"><span>Parsed events</span><strong id="metric-events">0</strong></div>
+          <div class="metric"><span>Incidents</span><strong id="metric-incidents">0</strong></div>
+          <div class="severity-grid">
+            <div><span>Critical</span><strong id="metric-critical">0</strong></div>
+            <div><span>High</span><strong id="metric-high">0</strong></div>
+            <div><span>Medium</span><strong id="metric-medium">0</strong></div>
+          </div>
+        </section>
+        <section class="panel rules-panel">
+          <p class="eyebrow">DETECTION LOGIC</p>
+          <h2>Active rules</h2>
+          <div id="rules"><p class="muted">Loading rules…</p></div>
+        </section>
+        <section class="panel history-panel">
+          <div class="heading"><div><p class="eyebrow">LOCAL DATABASE</p><h2>Recent analyses</h2></div></div>
+          <div id="history"><p class="muted">No saved analyses.</p></div>
+        </section>
+      </aside>
+    </section>
+    <footer>
+      <strong>SOC Triage Desk</strong> · Personal defensive-security learning project.
+      <p>Heuristic detections are leads for analyst review, not proof of compromise. Validate alerts against system context and other telemetry. Do not upload sensitive production logs to an untrusted environment.</p>
+    </footer>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
