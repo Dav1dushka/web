@@ -263,3 +263,38 @@ h2{
     text-shadow:
         0 0 10px #00ff88;
 }
+
+
+/* Portfolio refresh: project details, current education and skills without invented proficiency bars */
+.hero .eyebrow{margin-bottom:14px}
+.hero-intro{max-width:760px;margin:18px auto 0;color:#a8d7b7;font-size:15px!important;line-height:1.7}
+.profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px 26px}
+.profile-item{min-width:0}
+.profile-item span{display:block;color:#77b88f;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.profile-item strong{display:block;color:var(--text);font-size:14px;line-height:1.45}
+.profile-item p{line-height:1.7;margin:0}
+.profile-item.full{grid-column:1/-1}
+.skill-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.skill-card{background:var(--panel);border:1px solid rgba(0,255,136,.65);border-radius:12px;padding:19px 20px}
+.skill-card h3{color:var(--green);font-size:14px;margin-bottom:8px}
+.skill-card p{color:var(--text);font-size:13px;line-height:1.7;margin:0}
+.languages-heading{margin-top:34px}
+.language-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 20px}
+.language-list span{font-size:13px;line-height:1.5}
+.project-card{display:flex;flex-direction:column;min-height:220px}
+.project-card p{font-size:13px;line-height:1.65}
+.project-card .tech{color:#79c99a;font-size:11px;margin-top:auto;padding-top:9px}
+.project-card a,.contact-links a{display:inline-block;color:var(--green);text-decoration:none;font-size:12px;font-weight:bold;margin-top:9px}
+.project-card a:hover,.contact-links a:hover{text-shadow:0 0 10px var(--green)}
+.education-item{padding:7px 0 18px;border-bottom:1px solid rgba(0,255,136,.18);margin-bottom:15px}
+.education-item:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}
+.education-item .date{color:#79c99a;font-size:12px;margin-bottom:5px}
+.education-item h3{color:var(--green);font-size:15px;margin-bottom:5px}
+.education-item p:last-child{margin-bottom:0}
+.contact-links{display:flex;gap:23px;flex-wrap:wrap;margin-top:15px}
+@media(max-width:700px){
+ .profile-grid,.skill-grid{grid-template-columns:1fr}
+ .profile-item.full{grid-column:auto}
+ .language-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .hero-intro{font-size:13px!important}
+}
